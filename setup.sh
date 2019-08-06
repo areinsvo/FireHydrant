@@ -15,6 +15,6 @@ EOF
 cat <<EOF > $CONDA_PREFIX/etc/conda/deactivate.d/env_vars.sh
 #!/bin/sh
 export PYTHONPATH=\$PYTHONPATH_FHOLD
-unset PYTHONPATH__FHOLD
+unset PYTHONPATH_FHOLD
 unset FH_BASE
 EOF
