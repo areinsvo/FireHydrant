@@ -5,9 +5,19 @@ import json
 import shlex
 import subprocess
 import sys
+import socket
 import time
 
-OUTPUT_FILE = "/publicweb/w/wsi/public/lpcdm/backgroundsummary.txt"
+hostname = socket.gethostname()
+if 'lxplus' in hostname:
+    OUTPUT_FILE = "/eos/user/w/wsi/www/lpcdm/backgroundsummary.txt"
+    OUTPUT_URL = "https://wsi.web.cern.ch/wsi/lpcdm/backgroundsummary.txt"
+elif 'cmslpc' in hostname:
+    OUTPUT_FILE = "/publicweb/w/wsi/public/lpcdm/backgroundsummary.txt"
+    OUTPUT_URL = "http://home.fnal.gov/~wsi/public/lpcdm/backgroundsummary.txt"
+else:
+    sys.exit('Not on lxplus nor cmslpc platforms -> exiting')
+
 DATASET_GRP = json.load(open("backgroundlist.json"))
 
 
@@ -21,6 +31,10 @@ def sizeof_fmt(num, suffix="B"):
 
 
 def main():
+
+    ## check certificate
+    if subprocess.call(shlex.split('voms-proxy-info -exists')) != 0:
+        os.system("voms-proxy-init -voms cms -valid 192:00")
 
     with open(OUTPUT_FILE, "w") as outf:
         outf.write("Generated at {}\n".format(time.ctime()))
@@ -40,7 +54,8 @@ def main():
             outf.write("-" * 160 + "\n")
             for ds in datasets:
                 nFiles, nEvents, fileSize = (-1, -1, -1)
-                sites = []
+                sites = set()
+                transfering = {}
                 try:
                     dasquery = 'dasgoclient -query="summary dataset={}" -json'.format(ds)
                     dasres = subprocess.check_output(shlex.split((dasquery)))
@@ -53,35 +68,35 @@ def main():
                     nFiles = dasres["summary"][0]["num_file"]
                     nEvents = dasres["summary"][0]["num_event"]
                     fileSize = dasres["summary"][0]["file_size"]
-                    sites = []
-                    transfering = {}
+                    _sites = set()
+                    _transfering = {}
                     for siteinfo in dasres_site:
-                        _service = siteinfo["das"]["services"][0]
+                        if not siteinfo["das"]["services"][0].startswith('combined'): continue
+                        if siteinfo["site"][0]["kind"]!="Disk": continue
                         _sitename = siteinfo["site"][0]["name"]
-                        if _sitename.startswith("T0"):
-                            continue
-                        if _sitename.startswith("T1") and not _sitename.endswith("Disk"):
-                            continue
-                        if _sitename not in sites:
-                            sites.append(_sitename)
-                        if _service.startswith("combined"):
-                            if (
-                                siteinfo["site"][0]["block_completion"] != "100.00%"
-                                or siteinfo["site"][0]["block_fraction"] != "100.00%"
-                                or siteinfo["site"][0]["dataset_fraction"] != "100.00%"
-                                or siteinfo["site"][0]["replica_fraction"] != "100.00%"
-                            ):
-                                if _sitename in sites:
-                                    sites.remove(_sitename)
-                                transfering[_sitename] = (siteinfo["site"][0]["block_fraction"], siteinfo["site"][0]["dataset_fraction"])
+
+                        if (
+                            siteinfo["site"][0]["block_completion"] != "100.00%"
+                            or siteinfo["site"][0]["block_fraction"] != "100.00%"
+                            or siteinfo["site"][0]["dataset_fraction"] != "100.00%"
+                            or siteinfo["site"][0]["replica_fraction"] != "100.00%"
+                        ):
+                            _transfering[_sitename] = (siteinfo["site"][0]["block_fraction"], siteinfo["site"][0]["dataset_fraction"])
+                        else:
+                            _sites.add(_sitename)
+
+                    sites.update(_sites)
+                    transfering.update(_transfering)
 
                 except Exception:
                     ds += " **"
+                    sites.clear()
+                    transfering = {}
                 # if none available on disk, show transfer fraction if any
-                if not sites and transfering:
-                    sitesinfo = str(sites)+str(transfering)
+                if (not sites) and transfering:
+                    sitesinfo = str(list(sites))+str(transfering)
                 else:
-                    sitesinfo = str(sites)
+                    sitesinfo = str(list(sites))
                 outf.write(fmt.format(ds, nEvents, nFiles, sizeof_fmt(fileSize), sitesinfo) + "\n")
             outf.write("-" * 160 + "\n")
             print("--> took {:.3f}s".format(time.time() - starttimec))
@@ -90,8 +105,7 @@ def main():
     print('_'*60)
     print("--> took {:.3f}s".format(time.time() - starttime))
     print("Write summary at ", OUTPUT_FILE)
-    print("Please visit")
-    print("\thttp://home.fnal.gov/~wsi/public/lpcdm/backgroundsummary.txt")
+    print("Please visit", OUTPUT_URL)
 
 
 if __name__ == "__main__":
