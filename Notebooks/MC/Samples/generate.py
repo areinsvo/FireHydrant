@@ -130,12 +130,15 @@ BKG_XSEC = dict(
     },
 )
 
-
-EOSPATH_SIG = '/store/group/lpcmetx/SIDM/ffNtuple/2018/CRAB_PrivateMC/' # private signal MC
+# private signal MC
+EOSPATH_SIG = '/store/group/lpcmetx/SIDM/ffNtuple/2018/CRAB_PrivateMC/'
 EOSPATH_SIG2 = {
     "4mu": "/store/group/lpcmetx/SIDM/ffNtuple/2018/SIDM_XXTo2ATo4Mu",
     "2mu2e": "/store/group/lpcmetx/SIDM/ffNtuple/2018/SIDM_XXTo2ATo2Mu2E",
 }
+
+
+# _____________________________________________________________________________
 
 def generate_background_json():
 
@@ -278,6 +281,69 @@ def generate_signal_json():
         outf.write(json.dumps(json_2mu2e, indent=4))
 
 
+def generate_signal_scale():
+
+    from signalnumbers import genfiltereff, genxsec, darkphotonbr
+
+    filelists = {}
+    filelists['2mu2e'] = json.load(open("signal_2mu2e.json"))
+    filelists['4mu'] = json.load(open("signal_4mu.json"))
+
+    def decompose_paramtag(paramtag):
+        # paramtag  mXX-1000_mA-0p8_lxy-300 => (1000, 0.8, 300)
+        paramtags = paramtag.split('_')
+        assert (len(paramtags) == 3)
+
+        res = []
+        for t in paramtags:
+            v = t.split('-')[1]
+            if 'p' in v:
+                res.append(float(v.replace('p', '.')))
+            else:
+                res.append(int(v))
+
+        return tuple(res)
+
+    scale_2mu2e = {}
+    for paramtag in filelists['2mu2e']:
+        # paramtag like : mXX-1000_mA-0p8_lxy-300
+        parameters = decompose_paramtag(paramtag)
+        if parameters not in genfiltereff['2mu2e']:
+            # didn't run those samples
+            scale_2mu2e[paramtag] = 0
+            continue
+
+        filtereff = genfiltereff['2mu2e'][parameters]
+        xsec = genxsec[parameters[0]]
+        brs = darkphotonbr['ee'][parameters[1]] * darkphotonbr['mumu'][parameters[1]]
+        nevents = total_event_number(filelists['2mu2e'][paramtag])
+
+        scale_2mu2e[paramtag] = xsec * brs * filtereff / nevents
+
+    with open("signal_2mu2e_scale.json", "w") as outf:
+        outf.write(json.dumps(scale_2mu2e, indent=4))
+
+    scale_4mu = {}
+    for paramtag in filelists['4mu']:
+        # paramtag like : mXX-1000_mA-0p8_lxy-300
+        parameters = decompose_paramtag(paramtag)
+        if parameters not in genfiltereff['4mu']:
+            # didn't run those samples
+            scale_4mu[paramtag] = 0
+            continue
+
+        filtereff = genfiltereff['4mu'][parameters]
+        xsec = genxsec[parameters[0]]
+        brs = darkphotonbr['mumu'][parameters[1]] * darkphotonbr['mumu'][parameters[1]]
+        nevents = total_event_number(filelists['4mu'][paramtag])
+
+        scale_4mu[paramtag] = xsec * brs * filtereff / nevents
+
+    with open("signal_4mu_scale.json", "w") as outf:
+        outf.write(json.dumps(scale_4mu, indent=4))
+
+
+
 if __name__ == "__main__":
 
     import sys
@@ -289,3 +355,4 @@ if __name__ == "__main__":
 
     if sys.argv[1]=='sig':
         generate_signal_json()
+        generate_signal_scale()
