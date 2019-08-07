@@ -9,100 +9,121 @@ import concurrent.futures
 from FireHydrant.Tools.commonhelpers import eosls, eosfindfile
 
 EOSPATHS_BKG = dict(
-    TTJets={
-        "TTJets": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/TTJets_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ]
+    TTbar={
+        "2L2Nu": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "Hadronic": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "SemiLeptonic": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+    },
+    ST={
+        "AntiTop": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/ST_tW_antitop_5f_inclusiveDecays_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v1",],
+        "Top": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/ST_tW_top_5f_inclusiveDecays_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v1",],
+    },
+    WJets={
+        "WJets_HT-70To100": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-70To100_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        # "WJets_HT-100To200": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-100To200_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-200To400": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-200To400_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-400To600": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-400To600_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-600To800": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-600To800_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-800To1200": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-800To1200_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-1200To2500": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-1200To2500_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-2500ToInf": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-2500ToInf_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
     },
     DYJetsToLL={
-        "DYJetsToLL-M-10to50": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/DYJetsToLL_M-10to50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
-        ],
-        "DYJetsToLL_M-50": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ],
+        "DYJetsToLL-M-10to50": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/DYJetsToLL_M-10to50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"],
+        "DYJetsToLL_M-50": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"],
     },
     DiBoson={
         "WW": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WW_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WW_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
         ],
         "ZZ": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/ZZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
         ],
         "WZ": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
         ],
     },
     TriBoson={
         "WWW": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WWW_4F_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWW_4F_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
         ],
         "WWZ": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WWZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
         ],
         "WZZ": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
         ],
         "ZZZ": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/ZZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
         ],
         "WZG": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WZG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
         ],
         "WWG": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WWG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
         ],
         "WGG": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/WGG_5f_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WGG_5f_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
         ],
     },
     QCD={
-        "QCD_Pt-15to20": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        ],
+        # "QCD_Pt-15to20": [
+        #     "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
+        # ],
         "QCD_Pt-20to30": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-20to30_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v4"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-20to30_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v4"
         ],
         # "QCD_Pt-30to50": [
-        #     "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-30to50_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
+        #     "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-30to50_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
         # ],
         "QCD_Pt-50to80": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-50to80_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-50to80_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
         ],
         "QCD_Pt-80to120": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
         ],
         "QCD_Pt-120to170": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
         ],
         "QCD_Pt-170to300": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-170to300_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-170to300_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
         ],
         "QCD_Pt-300to470": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v1",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v1",
         ],
         "QCD_Pt-470to600": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
         ],
         "QCD_Pt-600to800": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-600to800_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-600to800_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
         ],
         "QCD_Pt-800to1000": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-800to1000_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v2"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-800to1000_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v2"
         ],
         "QCD_Pt-1000toInf": [
-            "/store/group/lpcmetx/MCSIDM/ffNtuple/2018/QCD_Pt-1000toInf_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
+            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-1000toInf_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
         ],
     },
 )
 
 
 BKG_XSEC = dict(
-    TTJets={"TTJets": 491},
+    TTbar={"Hadronic":687.1, "SemiLeptonic": 687.1, "2L2Nu": 687.1},
+    ST={"Top": 34.91, "AntiTop": 34.97},
+    WJets={
+        # "WJets_HT-70To100": 0,
+        # "WJets_HT-100To200": 1394,
+        "WJets_HT-200To400": 409.8,
+        "WJets_HT-400To600": 57.77,
+        "WJets_HT-600To800": 12.93,
+        "WJets_HT-800To1200": 5.454,
+        "WJets_HT-1200To2500": 1.085,
+        "WJets_HT-2500ToInf": 0.008062,
+    },
     DYJetsToLL={"DYJetsToLL-M-10to50": 15820, "DYJetsToLL_M-50": 5317},
     DiBoson={"WW": 75.91, "ZZ": 12.14, "WZ": 27.55},
     TriBoson={
@@ -115,7 +136,7 @@ BKG_XSEC = dict(
         "WGG": 2.001,
     },
     QCD={
-        "QCD_Pt-15to20": 2805000,
+        # "QCD_Pt-15to20": 2805000,
         "QCD_Pt-20to30": 2536000,
         # "QCD_Pt-30to50": 1375000,
         "QCD_Pt-50to80": 377900,
@@ -185,19 +206,48 @@ def total_event_number(filelist):
     return numevents
 
 
+def processed_genwgt_sum(ntuplefile):
+    """Given a ntuplefile path, return the sum of gen weights."""
+
+    f_ = uproot.open(ntuplefile)
+    key_ = f_.allkeys(filtername=lambda k: k.endswith(b"history"))[0]
+    return f_[key_].values[3]  # 0: run, 1: lumi, 2: events, 3: genwgtsum
+
+
+def total_genwgt_sum(filelist):
+    """Given a list of ntuple files, return the total sum of gen weights"""
+
+    numsum = 0
+    with concurrent.futures.ProcessPoolExecutor(max_workers=12) as executor:
+        futures = {executor.submit(processed_genwgt_sum, f): f for f in filelist}
+        for future in concurrent.futures.as_completed(futures):
+            filename = futures[future]
+            try:
+                numsum += future.result()
+            except Exception as e:
+                print(f">> Fail to get genwgts for {filename}\n{str(e)}")
+    return numsum
+
+
 def generate_background_scale():
     """parse all files to get number of events processed => scale
-        scale = xsec/#events, scale*lumi-> weight
+        scale = xsec/#genwgtsum, scale*lumi-> gen weight
     """
 
     bkgfilelist = json.load(open("backgrounds.json"))
     generated = dict()
     for group in BKG_XSEC:
         generated[group] = {}
-        for tag in BKG_XSEC[group]:
-            xsec = BKG_XSEC[group][tag]
-            numevents = total_event_number(bkgfilelist[group][tag])
-            generated[group][tag] = xsec / numevents
+        if group == "TriBoson": # sumgenwgts are 0 for these.. fall back to nevents
+            for tag in BKG_XSEC[group]:
+                xsec = BKG_XSEC[group][tag]
+                sumevents = total_event_number(bkgfilelist[group][tag])
+                generated[group][tag] = xsec / sumevents
+        else:
+            for tag in BKG_XSEC[group]:
+                xsec = BKG_XSEC[group][tag]
+                sumgenwgt = total_genwgt_sum(bkgfilelist[group][tag])
+                generated[group][tag] = xsec / sumgenwgt
 
     with open("backgrounds_scale.json", "w") as outf:
         outf.write(json.dumps(generated, indent=4))
