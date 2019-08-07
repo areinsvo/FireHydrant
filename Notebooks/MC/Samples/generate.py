@@ -115,7 +115,7 @@ BKG_XSEC = dict(
     TTbar={"Hadronic":687.1, "SemiLeptonic": 687.1, "2L2Nu": 687.1},
     ST={"Top": 34.91, "AntiTop": 34.97},
     WJets={
-        # "WJets_HT-70To100": 0,
+        "WJets_HT-70To100": 1290,
         # "WJets_HT-100To200": 1394,
         "WJets_HT-200To400": 409.8,
         "WJets_HT-400To600": 57.77,
