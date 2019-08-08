@@ -2,6 +2,9 @@
 
 Standalone scripts
 
+dasgoclient writes cache in home directory, loses permissions in nohup. Thus just do `python makeBackgroundSummary.py` everytime.
+
+---
 Update/install dependencies
 
 ```bash
