@@ -7,6 +7,7 @@ import subprocess
 import sys
 import socket
 import time
+import os
 
 hostname = socket.gethostname()
 if 'lxplus' in hostname:
