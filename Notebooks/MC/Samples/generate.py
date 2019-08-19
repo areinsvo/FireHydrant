@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 """Generate MC sample json file, until proper sample management tool show up.
 """
+import concurrent.futures
 import json
 from datetime import datetime
 from os.path import join
+
 import uproot
-import concurrent.futures
-from FireHydrant.Tools.commonhelpers import eosls, eosfindfile
+from FireHydrant.Tools.commonhelpers import eosfindfile, eosls
 
 EOSPATHS_BKG = dict(
-    TTbar={
-        "2L2Nu": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
-        "Hadronic": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
-        "SemiLeptonic": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+    TTJets={
+        "TTJets": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTJets_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "TTJets_SingleLeptFromT": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTJets_SingleLeptFromT_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "TTJets_SingleLeptFromTbar": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTJets_SingleLeptFromTbar_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "TTJets_DiLept": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/TTJets_DiLept_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
     },
     ST={
         "AntiTop": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/ST_tW_antitop_5f_inclusiveDecays_TuneCP5_13TeV-powheg-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v1",],
@@ -20,7 +22,7 @@ EOSPATHS_BKG = dict(
     },
     WJets={
         "WJets_HT-70To100": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-70To100_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
-        # "WJets_HT-100To200": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-100To200_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WJets_HT-100To200": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-100To200_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
         "WJets_HT-200To400": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-200To400_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
         "WJets_HT-400To600": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-400To600_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
         "WJets_HT-600To800": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WJetsToLNu_HT-600To800_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
@@ -33,52 +35,24 @@ EOSPATHS_BKG = dict(
         "DYJetsToLL_M-50": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"],
     },
     DiBoson={
-        "WW": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WW_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
-        ],
-        "ZZ": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2"
-        ],
-        "WZ": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        ],
+        "WW": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WW_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2",],
+        "ZZ": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v2",],
+        "WZ": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WZ_TuneCP5_13TeV-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
     },
     TriBoson={
-        "WWW": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWW_4F_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
-        ],
-        "WWZ": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
-        ],
-        "WZZ": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
-        ],
-        "ZZZ": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
-        ],
-        "WZG": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WZG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ],
-        "WWG": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WWG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2"
-        ],
-        "WGG": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/WGG_5f_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ],
+        "WWW": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WWW_4F_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",],
+        "WWZ": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WWZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",],
+        "WZZ": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",],
+        "ZZZ": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/ZZZ_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",],
+        "WZG": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WZG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "WWG": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WWG_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",],
+        "WGG": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WGG_5f_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
     },
     QCD={
-        # "QCD_Pt-15to20": [
-        #     "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        # ],
-        "QCD_Pt-20to30": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-20to30_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v4"
-        ],
-        # "QCD_Pt-30to50": [
-        #     "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-30to50_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        # ],
-        "QCD_Pt-50to80": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-50to80_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        ],
+        # "QCD_Pt-15to20": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
+        "QCD_Pt-20to30": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-20to30_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v4",],
+        # "QCD_Pt-30to50": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-30to50_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
+        "QCD_Pt-50to80": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-50to80_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
         "QCD_Pt-80to120": [
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-80to120_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
@@ -87,9 +61,7 @@ EOSPATHS_BKG = dict(
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
         ],
-        "QCD_Pt-170to300": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-170to300_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3"
-        ],
+        "QCD_Pt-170to300": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-170to300_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
         "QCD_Pt-300to470": [
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v1",
@@ -98,34 +70,98 @@ EOSPATHS_BKG = dict(
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
             "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
         ],
-        "QCD_Pt-600to800": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-600to800_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ],
-        "QCD_Pt-800to1000": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-800to1000_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v2"
-        ],
-        "QCD_Pt-1000toInf": [
-            "/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-1000toInf_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1"
-        ],
+        "QCD_Pt-600to800": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-600to800_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "QCD_Pt-800to1000": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-800to1000_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v2",],
+        "QCD_Pt-1000toInf": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-1000toInf_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
     },
 )
 
 
+# BKG_XSEC = dict(
+#     TTJets={
+#         "TTJets": 491.3,
+#         "TTJets_SingleLeptFromT": 108.5,
+#         "TTJets_SingleLeptFromTbar": 109.1,
+#         "TTJets_DiLept": 54.29,
+#     },
+#     ST={
+#         "Top": 34.91,
+#         "AntiTop": 34.97,
+#     },
+#     WJets={
+#         "WJets_HT-70To100": 1290,
+#         "WJets_HT-100To200": 1394,
+#         "WJets_HT-200To400": 409.8,
+#         "WJets_HT-400To600": 57.77,
+#         "WJets_HT-600To800": 12.93,
+#         "WJets_HT-800To1200": 5.454,
+#         "WJets_HT-1200To2500": 1.085,
+#         "WJets_HT-2500ToInf": 0.008062,
+#     },
+#     DYJetsToLL={
+#         "DYJetsToLL-M-10to50": 15820,
+#         "DYJetsToLL_M-50": 5317,
+#     },
+#     DiBoson={
+#         "WW": 75.91,
+#         "ZZ": 12.14,
+#         "WZ": 27.55
+#     },
+#     TriBoson={
+#         "WWW": 0.2154,
+#         "WWZ": 0.1676,
+#         "WZZ": 0.05701,
+#         "ZZZ": 0.01473,
+#         "WZG": 0.04345,
+#         "WWG": 0.2316,
+#         "WGG": 2.001,
+#     },
+#     QCD={
+#         # "QCD_Pt-15to20": 2805000,
+#         "QCD_Pt-20to30": 2536000,
+#         # "QCD_Pt-30to50": 1375000,
+#         "QCD_Pt-50to80": 377900,
+#         "QCD_Pt-80to120": 89730,
+#         "QCD_Pt-120to170": 21410,
+#         "QCD_Pt-170to300": 7022,
+#         "QCD_Pt-300to470": 619.8,
+#         "QCD_Pt-470to600": 59.32,
+#         "QCD_Pt-600to800": 18.19,
+#         "QCD_Pt-800to1000": 3.271,
+#         "QCD_Pt-1000toInf": 1.08,
+#     },
+# )
+
 BKG_XSEC = dict(
-    TTbar={"Hadronic":687.1, "SemiLeptonic": 687.1, "2L2Nu": 687.1},
-    ST={"Top": 34.91, "AntiTop": 34.97},
-    WJets={
-        "WJets_HT-70To100": 1290,
-        # "WJets_HT-100To200": 1394,
-        "WJets_HT-200To400": 409.8,
-        "WJets_HT-400To600": 57.77,
-        "WJets_HT-600To800": 12.93,
-        "WJets_HT-800To1200": 5.454,
-        "WJets_HT-1200To2500": 1.085,
-        "WJets_HT-2500ToInf": 0.008062,
+    TTJets={
+        "TTJets": 491.3,
+        "TTJets_SingleLeptFromT": 108.5,
+        "TTJets_SingleLeptFromTbar": 109.1,
+        "TTJets_DiLept": 54.29,
     },
-    DYJetsToLL={"DYJetsToLL-M-10to50": 15820, "DYJetsToLL_M-50": 5317},
-    DiBoson={"WW": 75.91, "ZZ": 12.14, "WZ": 27.55},
+    ST={
+        "Top": 34.91,
+        "AntiTop": 34.97,
+    },
+    WJets={
+        "WJets_HT-70To100": 1353,
+        "WJets_HT-100To200": 1395,
+        "WJets_HT-200To400": 407.9,
+        "WJets_HT-400To600": 57.48,
+        "WJets_HT-600To800": 12.87,
+        "WJets_HT-800To1200": 5.366,
+        "WJets_HT-1200To2500": 1.074,
+        "WJets_HT-2500ToInf": 0.008001,
+    },
+    DYJetsToLL={
+        "DYJetsToLL-M-10to50": 15820,
+        "DYJetsToLL_M-50": 5317,
+    },
+    DiBoson={
+        "WW": 75.91,
+        "ZZ": 12.14,
+        "WZ": 27.55
+    },
     TriBoson={
         "WWW": 0.2154,
         "WWZ": 0.1676,
@@ -136,15 +172,15 @@ BKG_XSEC = dict(
         "WGG": 2.001,
     },
     QCD={
-        # "QCD_Pt-15to20": 2805000,
-        "QCD_Pt-20to30": 2536000,
-        # "QCD_Pt-30to50": 1375000,
-        "QCD_Pt-50to80": 377900,
-        "QCD_Pt-80to120": 89730,
-        "QCD_Pt-120to170": 21410,
-        "QCD_Pt-170to300": 7022,
+        # "QCD_Pt-15to20": 279900,
+        "QCD_Pt-20to30": 2526000,
+        # "QCD_Pt-30to50": 1362000,
+        "QCD_Pt-50to80": 376600,
+        "QCD_Pt-80to120": 88930,
+        "QCD_Pt-120to170": 21230,
+        "QCD_Pt-170to300": 7055,
         "QCD_Pt-300to470": 619.8,
-        "QCD_Pt-470to600": 59.32,
+        "QCD_Pt-470to600": 59.24,
         "QCD_Pt-600to800": 18.19,
         "QCD_Pt-800to1000": 3.271,
         "QCD_Pt-1000toInf": 1.08,
@@ -210,8 +246,13 @@ def processed_genwgt_sum(ntuplefile):
     """Given a ntuplefile path, return the sum of gen weights."""
 
     f_ = uproot.open(ntuplefile)
-    key_ = f_.allkeys(filtername=lambda k: k.endswith(b"history"))[0]
-    return f_[key_].values[3]  # 0: run, 1: lumi, 2: events, 3: genwgtsum
+    key_ = f_.allkeys(filtername=lambda k: k.endswith(b"weight"))
+    if key_:
+        key_ = key_[0]
+        return f_[key_]['weight'].array().sum()
+    else:
+        key_ = f_.allkeys(filtername=lambda k: k.endswith(b"history"))[0]
+        return f_[key_].values[3]  # 0: run, 1: lumi, 2: events, 3: genwgtsum
 
 
 def total_genwgt_sum(filelist):
@@ -238,16 +279,13 @@ def generate_background_scale():
     generated = dict()
     for group in BKG_XSEC:
         generated[group] = {}
-        if group == "TriBoson": # sumgenwgts are 0 for these.. fall back to nevents
-            for tag in BKG_XSEC[group]:
-                xsec = BKG_XSEC[group][tag]
-                sumevents = total_event_number(bkgfilelist[group][tag])
-                generated[group][tag] = xsec / sumevents
-        else:
-            for tag in BKG_XSEC[group]:
-                xsec = BKG_XSEC[group][tag]
-                sumgenwgt = total_genwgt_sum(bkgfilelist[group][tag])
-                generated[group][tag] = xsec / sumgenwgt
+
+        for tag in BKG_XSEC[group]:
+            xsec = BKG_XSEC[group][tag]
+            sumgenwgt = total_genwgt_sum(bkgfilelist[group][tag])
+            generated[group][tag] = xsec / sumgenwgt
+#             nevents = total_event_number(bkgfilelist[group][tag])
+#             generated[group][tag] = xsec / nevents
 
     with open("backgrounds_scale.json", "w") as outf:
         outf.write(json.dumps(generated, indent=4))

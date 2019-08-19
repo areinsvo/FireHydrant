@@ -2,11 +2,14 @@
 """Text filing dataset info returned by dasgoclient queries
 """
 import json
+import os
 import shlex
+import socket
 import subprocess
 import sys
-import socket
 import time
+
+import yaml
 
 hostname = socket.gethostname()
 if 'lxplus' in hostname:
@@ -18,7 +21,7 @@ elif 'cmslpc' in hostname:
 else:
     sys.exit('Not on lxplus nor cmslpc platforms -> exiting')
 
-DATASET_GRP = json.load(open("backgroundlist.json"))
+DATASET_GRP = yaml.load(open("backgroundlist.yml"), Loader=yaml.FullLoader)
 
 
 # https://stackoverflow.com/questions/1094841/reusable-library-to-get-human-readable-version-of-file-size

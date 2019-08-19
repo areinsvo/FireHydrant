@@ -9,21 +9,21 @@ import uproot
 from coffea.lookup_tools.dense_lookup import dense_lookup
 
 
-def get_pu_weights(nvtx):
+def get_pu_weights_function():
 
     pufile_ = uproot.open(join(os.getenv('FH_BASE'), 'FireHydrant/Tools/store/puWeights_10x_56ifb.root'))
     sf_pu_cen = dense_lookup(pufile_['puWeights'].values, pufile_['puWeights'].edges)
     sf_pu_up  = dense_lookup(pufile_['puWeightsUp'].values, pufile_['puWeightsUp'].edges)
     sf_pu_down= dense_lookup(pufile_['puWeightsDown'].values, pufile_['puWeightsDown'].edges)
 
-    return sf_pu_cen(nvtx), sf_pu_up(nvtx), sf_pu_down(nvtx)
+    return sf_pu_cen, sf_pu_up, sf_pu_down
 
 
 def get_ttbar_weight(pt):
     return np.exp(0.0615 - 0.0005 * np.clip(pt, 0, 800))
 
 
-def get_nlo_weight(type, pt):
+def get_nlo_weight_function(type):
     kfactor = uproot.open(join(os.getenv('FH_BASE'), 'FireHydrant/Tools/store/kfactors.root'))
     sf_qcd = 1.
     sf_ewk = 1
@@ -39,6 +39,12 @@ def get_nlo_weight(type, pt):
         w="WJets_012j_NLO/nominal",
         a="GJets_1j_NLO/nominal_G",
     )
+    
+    ewk = dict(
+        z="EWKcorr/Z",
+        w="EWKcorr/W",
+        a="EWKcorr/photon",
+    )
 
     LO = kfactor[lo[type]].values
     NLO = kfactor[nlo[type]].values
@@ -49,4 +55,4 @@ def get_nlo_weight(type, pt):
 
     correction = dense_lookup(sf_qcd * sf_ewk, kfactor[nlo[type]].edges)
 
-    return correction(pt)
+    return correction
