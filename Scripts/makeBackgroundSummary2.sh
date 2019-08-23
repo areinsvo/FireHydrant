@@ -1,5 +1,6 @@
 #!/bin/bash
 
+kinit -k -t /uscms/home/wsi/private/wsi.keytab wsi@FNAL.GOV
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 cd /uscms/home/wsi/nobackup/lpcdm/CMSSW_10_2_14/src
 eval `scramv1 runtime -sh`

@@ -7,6 +7,7 @@ import ssl
 import sys
 import time
 import urllib2
+import shutil
 from collections import defaultdict
 from threading import Thread
 
@@ -158,7 +159,7 @@ def main():
     manyrecord(datasets_flat, recordstore)
 
     fmt = "{:145}{:>10}{:>10}{:>10}  {}"
-    outf = open(OUTPUT_FILE, 'w')
+    outf = open('backgroundsummary.log', 'w')
     print("Generated at {}".format(time.ctime()), file=outf)
     print('=' * 140, end='\n\n', file=outf)
     print(fmt.format("Dataset", "#Events", "#Files", "size", "sites(disk only)"), file=outf)
@@ -173,7 +174,7 @@ def main():
                   file=outf)
         print('-' * 160, file=outf)
     outf.close()
-
+    shutil.move('backgroundsummary.log', OUTPUT_FILE)
 
 
 if __name__ == "__main__":
