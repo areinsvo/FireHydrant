@@ -294,8 +294,8 @@ def generate_background_scale():
 def remove_empty_file(filepath):
     """given a file, if the tree has non-zero number of events, return filepath"""
     f_ = uproot.open(filepath)
-    key_ = f_.allkeys(filtername=lambda k: k.endswith(b"ffNtuple"))[0]
-    if uproot.open(filepath)[key_].numentries != 0:
+    key_ = f_.allkeys(filtername=lambda k: k.endswith(b"ffNtuple"))
+    if key_ and uproot.open(filepath)[key_[0]].numentries != 0:
         return filepath
     else:
         return None
