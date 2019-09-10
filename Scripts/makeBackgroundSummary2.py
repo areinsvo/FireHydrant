@@ -2,18 +2,17 @@
 from __future__ import print_function
 
 import json
+import shutil
 import socket
 import ssl
 import sys
 import time
 import urllib2
-import shutil
 from collections import defaultdict
 from threading import Thread
 
 import yaml
 from dbs.apis.dbsClient import DbsApi
-
 
 hostname = socket.gethostname()
 if 'lxplus' in hostname:

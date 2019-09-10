@@ -49,7 +49,7 @@ EOSPATHS_BKG = dict(
         "WGG": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/WGG_5f_TuneCP5_13TeV-amcatnlo-pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
     },
     QCD={
-        # "QCD_Pt-15to20": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
+        "QCD_Pt-15to20": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-15to20_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
         "QCD_Pt-20to30": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-20to30_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v4",],
         # "QCD_Pt-30to50": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-30to50_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
         "QCD_Pt-50to80": ["/store/group/lpcmetx/SIDM/ffNtuple/2018/QCD_Pt-50to80_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
@@ -172,7 +172,7 @@ BKG_XSEC = dict(
         "WGG": 2.001,
     },
     QCD={
-        # "QCD_Pt-15to20": 279900,
+        "QCD_Pt-15to20": 279900,
         "QCD_Pt-20to30": 2526000,
         # "QCD_Pt-30to50": 1362000,
         "QCD_Pt-50to80": 376600,
@@ -334,6 +334,7 @@ def generate_signal_json():
     paramsubdirs = eosls(EOSPATH_SIG)
     json_4mu, json_2mu2e = {}, {}
     for subdir in paramsubdirs:
+        if '0p8' in subdir or '2p5' in subdir: continue # skipping unrequested lifetime points
         if '4Mu' in subdir:
             key = subdir.replace('SIDM_BsTo2DpTo4Mu_', '').split('_ctau')[0].replace('MBs', 'mXX').replace('MDp', 'mA')
             key += '_lxy-300' # mXX-1000_mA-0p25_lxy-300
