@@ -1,0 +1,13 @@
+{
+    "C": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018C/191021_120030/ffNtuple_0.root"
+    ],
+    "D": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_0.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_1.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_2.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_3.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_4.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D/191021_120033/ffNtuple_5.root"
+    ]
+}

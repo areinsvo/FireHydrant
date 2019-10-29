@@ -329,7 +329,7 @@ def clean_background_json():
         outf.write(json.dumps(bkgfilelist, indent=4))
 
 
-def generate_signal_json():
+def generate_signal_json(version=-1):
     """generate private signal file list json"""
     paramsubdirs = eosls(EOSPATH_SIG)
     json_4mu, json_2mu2e = {}, {}
@@ -340,14 +340,14 @@ def generate_signal_json():
             key += '_lxy-300' # mXX-1000_mA-0p25_lxy-300
             timestampdirs = eosls(join(EOSPATH_SIG, subdir))
             timestampdirs = sorted(timestampdirs, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))
-            latest = join(EOSPATH_SIG, subdir, timestampdirs[-1])
+            latest = join(EOSPATH_SIG, subdir, timestampdirs[version])
             json_4mu[key] = [f for f in eosfindfile(latest) if '/failed/' not in f]
         if '2Mu2e' in subdir:
             key = subdir.replace('SIDM_BsTo2DpTo2Mu2e_', '').split('_ctau')[0].replace('MBs', 'mXX').replace('MDp', 'mA')
             key += '_lxy-300'
             timestampdirs = eosls(join(EOSPATH_SIG, subdir))
             timestampdirs = sorted(timestampdirs, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))
-            latest = join(EOSPATH_SIG, subdir, timestampdirs[-1])
+            latest = join(EOSPATH_SIG, subdir, timestampdirs[version])
             json_2mu2e[key] = [f for f in eosfindfile(latest) if '/failed/' not in f]
 
     ## samples with new naming
@@ -355,18 +355,18 @@ def generate_signal_json():
         key = subdir.split('_ctau')[0]  # mXX-100_mA-5_lxy-0p3
         timestampdirs = eosls(join(EOSPATH_SIG2['4mu'], subdir))
         timestampdirs = sorted(timestampdirs, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))
-        latest = join(EOSPATH_SIG2['4mu'], subdir, timestampdirs[-1])
+        latest = join(EOSPATH_SIG2['4mu'], subdir, timestampdirs[version])
         json_4mu[key] = [f for f in eosfindfile(latest) if '/failed/' not in f]
     for subdir in eosls(EOSPATH_SIG2['2mu2e']):
         key = subdir.split('_ctau')[0]  # mXX-100_mA-5_lxy-0p3
         timestampdirs = eosls(join(EOSPATH_SIG2['2mu2e'], subdir))
         timestampdirs = sorted(timestampdirs, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))
-        latest = join(EOSPATH_SIG2['2mu2e'], subdir, timestampdirs[-1])
+        latest = join(EOSPATH_SIG2['2mu2e'], subdir, timestampdirs[version])
         json_2mu2e[key] = [f for f in eosfindfile(latest) if '/failed/' not in f]
 
-    with open('signal_4mu.json', 'w') as outf:
+    with open(f'signal_4mu{version}.json', 'w') as outf:
         outf.write(json.dumps(json_4mu, indent=4))
-    with open('signal_2mu2e.json', 'w') as outf:
+    with open(f'signal_2mu2e{version}.json', 'w') as outf:
         outf.write(json.dumps(json_2mu2e, indent=4))
 
 
@@ -443,5 +443,8 @@ if __name__ == "__main__":
         clean_background_json()
 
     if sys.argv[1]=='sig':
-        generate_signal_json()
-        generate_signal_scale()
+        version = -1
+        if len(sys.argv)==3:
+            version = int(sys.argv[2])
+        generate_signal_json(version)
+        # generate_signal_scale()

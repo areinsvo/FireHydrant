@@ -7,6 +7,8 @@ from os.path import join
 import numpy as np
 import uproot
 from coffea.lookup_tools.dense_lookup import dense_lookup
+import coffea.processor as processor
+from FireHydrant.Tools.metfilter import MetFilters
 
 
 def get_pu_weights_function():

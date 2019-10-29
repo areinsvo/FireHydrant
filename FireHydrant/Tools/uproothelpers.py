@@ -18,3 +18,11 @@ def NestNestObjArrayToJagged(objarr):
 
 #     return JaggedArray.fromoffsets(jaggedList.offsets, _jagged)
     return awkward.fromiter(objarr)
+
+def fromNestNestIndexArray(content, nnidx):
+    """indexing a JaggedArray with a two-level nested index array"""
+
+    outcontent = content[nnidx.flatten(axis=1)].flatten()
+    outnest = awkward.JaggedArray.fromoffsets(nnidx.flatten().offsets, outcontent)
+    out = awkward.JaggedArray.fromoffsets(nnidx.offsets, outnest)
+    return out
