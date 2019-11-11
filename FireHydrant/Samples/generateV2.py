@@ -319,7 +319,7 @@ if __name__ == "__main__":
             scales = generate_background_scale(datasets)
             outfn = join(outdir, f"skimmed_backgrounds_scale_{datetime.now().strftime('%y%m%d')}.json")
             shortcutfn = join(shortcutdir, 'skimmed_backgrounds_scale.json')
-            stage_out_json(outfn, datasets, shortcutdir, shortcutfn)
+            stage_out_json(outfn, scales, shortcutdir, shortcutfn)
         else:
             datasets_ = generate_data_files()
 

@@ -4,14 +4,14 @@ import json
 import os
 from os.path import join, basename
 
-DATASET_BKG = join(os.getenv("FH_BASE"), "FireHydrant/Samples/skimmed_backgrounds.json")
-DATASET_DATA = join(os.getenv("FH_BASE"), "FireHydrant/Samples/skimmed_control_data2018.json")
-SCALE_BKG = join(os.getenv("FH_BASE"), "FireHydrant/Samples/skimmed_backgrounds_scale.json")
+DATASET_BKG = join(os.getenv("FH_BASE"), "FireHydrant/Samples/latest/skimmed_backgrounds.json")
+DATASET_DATA = join(os.getenv("FH_BASE"), "FireHydrant/Samples/latest/skimmed_control_data2018.json")
+SCALE_BKG = join(os.getenv("FH_BASE"), "FireHydrant/Samples/latest/skimmed_backgrounds_scale.json")
 
-DATASET_SIG_4MU = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/signal_4mu.json')
-DATASET_SIG_2MU2E = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/signal_2mu2e.json')
-SCALE_SIG_4MU = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/signal_4mu_scale.json')
-SCALE_SIG_2MU2E = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/signal_2mu2e_scale.json')
+DATASET_SIG_4MU = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/latest/signal_4mu.json')
+DATASET_SIG_2MU2E = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/latest/signal_2mu2e.json')
+SCALE_SIG_4MU = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/latest/signal_4mu_scale.json')
+SCALE_SIG_2MU2E = join(os.getenv('FH_BASE'), 'FireHydrant/Samples/latest/signal_2mu2e_scale.json')
 
 LUMI = 59.74 * 1e3
 

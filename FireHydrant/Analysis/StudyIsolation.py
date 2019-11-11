@@ -303,6 +303,6 @@ if __name__ == "__main__":
 
     if args.sync:
         webdir = 'wsi@lxplus.cern.ch:/eos/user/w/wsi/www/public/firehydrant'
-        cmd = f'rsync -az --exclude ".*" {outdir} {webdir}'
+        cmd = f'rsync -az --exclude ".*" --delete {outdir} {webdir}'
         print(f"--> sync with: {webdir}")
         os.system(cmd)
