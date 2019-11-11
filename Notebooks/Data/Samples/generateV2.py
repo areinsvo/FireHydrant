@@ -17,10 +17,10 @@ EOSPATHS = dict(
 
 # This is skimmed control region events.
 EOSPATHS_SKIM = dict(
-    A="/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018A",
-    B="/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018B",
-    C="/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018C",
-    D="/store/group/lpcmetx/SIDM/ffNtupleV2/2018/SkimmedData/DoubleMuon2018D",
+    A="/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2",
+    B="/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1",
+    C="/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1",
+    D="/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2",
 )
 
 REDIRECTOR = "root://cmseos.fnal.gov/"
