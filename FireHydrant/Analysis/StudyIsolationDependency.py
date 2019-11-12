@@ -17,6 +17,7 @@ from FireHydrant.Tools.trigger import Triggers
 
 parser = argparse.ArgumentParser(description="leptonjet isolation profile of pt, eta")
 parser.add_argument("--sync", action='store_true', help="issue rsync command to sync plots folder to lxplus web server")
+parser.add_argument("--preserve", action='store_true', help="preserve plots in ROOT file")
 args = parser.parse_args()
 
 import ROOT
@@ -231,6 +232,17 @@ if __name__ == "__main__":
             c.SaveAs(f'{outdir}/sig-eta__{k}.pdf')
         c.Clear()
 
+    if args.preserve:
+        outrootfn = f'{outdir}/plots.root'
+        outrootf = ROOT.TFile(outrootfn, 'RECREATE')
+        outrootf.cd()
+        for hprof in hprofs_pt.values():
+            hprof.Write()
+        for hprof in hprofs_eta.values():
+            hprof.Write()
+        outrootf.Close()
+
+
     print('[background]')
     output = processor.run_uproot_job(bkgDS,
                                       treename='ffNtuplizer/ffNtuple',
@@ -259,6 +271,18 @@ if __name__ == "__main__":
             c.SaveAs(f'{outdir}/bkg-eta__{k}.png')
             c.SaveAs(f'{outdir}/bkg-eta__{k}.pdf')
         c.Clear()
+
+    if args.preserve:
+        outrootfn = f'{outdir}/plots.root'
+        outrootf = ROOT.TFile(outrootfn, 'UPDATE')
+        outrootf.cd()
+        for hprof in hprofs_pt.values():
+            hprof.Write()
+        for hprof in hprofs_eta.values():
+            hprof.Write()
+        outrootf.Close()
+
+
 
     print('[data]')
     output = processor.run_uproot_job(dataDS,
@@ -289,7 +313,18 @@ if __name__ == "__main__":
             c.SaveAs(f'{outdir}/data-eta__{k}.pdf')
         c.Clear()
 
+    if args.preserve:
+        outrootfn = f'{outdir}/plots.root'
+        outrootf = ROOT.TFile(outrootfn, 'UPDATE')
+        outrootf.cd()
+        for hprof in hprofs_pt.values():
+            hprof.Write()
+        for hprof in hprofs_eta.values():
+            hprof.Write()
+        outrootf.Close()
+
     c.Close()
+
 
     if args.sync:
         webdir = 'wsi@lxplus.cern.ch:/eos/user/w/wsi/www/public/firehydrant'
