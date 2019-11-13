@@ -202,6 +202,8 @@ if __name__ == "__main__":
     outdir = join(os.getenv('FH_BASE'), "Imgs", __file__.split('.')[0])
     if not isdir(outdir): os.makedirs(outdir)
 
+    hprofs_pt, hprofs_eta = {}, {}
+
     print('[signal]')
     output = processor.run_uproot_job(sigDS,
                                       treename='ffNtuplizer/ffNtuple',
@@ -213,34 +215,24 @@ if __name__ == "__main__":
 
 
     print("Filling..")
-    hprofs_pt, hprofs_eta = root_filling(output, 'sig')
+    hprofs_pt['sig'], hprofs_eta['sig'] = root_filling(output, 'sig')
 
     print("Saving...")
     c = ROOT.TCanvas('c', 'canvas', 700, 500)
-    for k, hprof in hprofs_pt.items():
+    for k, hprof in hprofs_pt['sig'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
             c.SaveAs(f'{outdir}/sig-pt__{k}.png')
             c.SaveAs(f'{outdir}/sig-pt__{k}.pdf')
         c.Clear()
-    for k, hprof in hprofs_eta.items():
+    for k, hprof in hprofs_eta['sig'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
             c.SaveAs(f'{outdir}/sig-eta__{k}.png')
             c.SaveAs(f'{outdir}/sig-eta__{k}.pdf')
         c.Clear()
-
-    if args.preserve:
-        outrootfn = f'{outdir}/plots.root'
-        outrootf = ROOT.TFile(outrootfn, 'RECREATE')
-        outrootf.cd()
-        for hprof in hprofs_pt.values():
-            hprof.Write()
-        for hprof in hprofs_eta.values():
-            hprof.Write()
-        outrootf.Close()
 
 
     print('[background]')
@@ -254,34 +246,23 @@ if __name__ == "__main__":
 
 
     print("Filling..")
-    hprofs_pt, hprofs_eta = root_filling(output, 'bkg')
+    hprofs_pt['bkg'], hprofs_eta['bkg'] = root_filling(output, 'bkg')
 
     print("Saving...")
-    for k, hprof in hprofs_pt.items():
+    for k, hprof in hprofs_pt['bkg'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
             c.SaveAs(f'{outdir}/bkg-pt__{k}.png')
             c.SaveAs(f'{outdir}/bkg-pt__{k}.pdf')
         c.Clear()
-    for k, hprof in hprofs_eta.items():
+    for k, hprof in hprofs_eta['bkg'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
             c.SaveAs(f'{outdir}/bkg-eta__{k}.png')
             c.SaveAs(f'{outdir}/bkg-eta__{k}.pdf')
         c.Clear()
-
-    if args.preserve:
-        outrootfn = f'{outdir}/plots.root'
-        outrootf = ROOT.TFile(outrootfn, 'UPDATE')
-        outrootf.cd()
-        for hprof in hprofs_pt.values():
-            hprof.Write()
-        for hprof in hprofs_eta.values():
-            hprof.Write()
-        outrootf.Close()
-
 
 
     print('[data]')
@@ -295,17 +276,17 @@ if __name__ == "__main__":
 
 
     print("Filling..")
-    hprofs_pt, hprofs_eta = root_filling(output, 'data')
+    hprofs_pt['data'], hprofs_eta['data'] = root_filling(output, 'data')
 
     print("Saving...")
-    for k, hprof in hprofs_pt.items():
+    for k, hprof in hprofs_pt['data'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
             c.SaveAs(f'{outdir}/data-pt__{k}.png')
             c.SaveAs(f'{outdir}/data-pt__{k}.pdf')
         c.Clear()
-    for k, hprof in hprofs_eta.items():
+    for k, hprof in hprofs_eta['data'].items():
         hprof.Draw()
         c.Draw()
         with _setIgnoreLevel(ROOT.kError):
@@ -313,17 +294,53 @@ if __name__ == "__main__":
             c.SaveAs(f'{outdir}/data-eta__{k}.pdf')
         c.Clear()
 
+    c.Close()
+
+
+    overlayCanvas_pt = {}
+    COLORS = [ROOT.kBlue, ROOT.kRed, ROOT.kGreen]
+    for k in hprofs_pt['sig']:
+        overlayCanvas_pt[k] = ROOT.TCanvas(f'overlay-pt__{k}', '', 700, 500)
+        overlayCanvas_pt[k].cd()
+        overlayCanvas_pt[k].SetLogx()
+        x1, y1, height = None, None, None
+        profs = [hprofs_pt['sig'][k], hprofs_pt['bkg'][k], hprofs_pt['data'][k]]
+        for i, h in enumerate(profs):
+            h.SetLineColor(COLORS[i])
+            h.GetYaxis().SetRangeUser(0, 0.8)
+            if i==0: h.Draw()
+            else: h.Draw('same')
+            ROOT.gPad.Update() # this is needed, otherwise `FindObject('stats')` would return null ptr.
+            statbox = h.FindObject('stats')
+            if i==0:
+                x1, y1 = statbox.GetX1NDC(), statbox.GetY1NDC()
+                height = statbox.GetY2NDC()-statbox.GetY1NDC()
+            else:
+                statbox.SetY2NDC(y1)
+                y1 -= height
+                statbox.SetY1NDC(y1)
+            statbox.SetTextColor(COLORS[i])
+            overlayCanvas_pt[k].Update()
+        with _setIgnoreLevel(ROOT.kError):
+            overlayCanvas_pt[k].SaveAs(f'{outdir}/overlay-pt__{k}.png')
+            overlayCanvas_pt[k].SaveAs(f'{outdir}/overlay-pt__{k}.pdf')
+
+
     if args.preserve:
         outrootfn = f'{outdir}/plots.root'
-        outrootf = ROOT.TFile(outrootfn, 'UPDATE')
+        print(f"--> preserving")
+        outrootf = ROOT.TFile(outrootfn, 'RECREATE')
         outrootf.cd()
-        for hprof in hprofs_pt.values():
-            hprof.Write()
-        for hprof in hprofs_eta.values():
-            hprof.Write()
+        for hprofs in hprofs_pt.values():
+            for hprof in hprofs.values():
+                hprof.Write()
+        for hprofs in hprofs_eta.values():
+            for hprof in hprofs.values():
+                hprof.Write()
+        for c in overlayCanvas_pt.values():
+            c.Write()
+            c.Close()
         outrootf.Close()
-
-    c.Close()
 
 
     if args.sync:
