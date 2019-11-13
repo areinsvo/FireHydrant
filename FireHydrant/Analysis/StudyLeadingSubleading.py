@@ -39,7 +39,7 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         self.data_type = data_type
 
         dataset_axis = hist.Cat('dataset', 'dataset')
-        pt_axis = hist.Bin('pt', '$p_T$ [GeV]', 100, 0, 500)
+        pt_axis = hist.Bin('pt', '$p_T$ [GeV]', 100, 0, 200)
         eta_axis = hist.Bin('eta', 'eta', 100, -2.5, 2.5)
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
 

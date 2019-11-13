@@ -25,9 +25,9 @@ class DatasetMapLoader:
         if debug:
             print("DatasetMapLoader loading...")
             print('+'*50)
-            print("@ Backgrounds -->", basename(DATASET_BKG))
-            print("@ Data        -->", basename(DATASET_DATA))
-            print("@ bkg scale   -->", basename(SCALE_BKG))
+            print("@ Backgrounds -->", basename(os.readlink(DATASET_BKG)))
+            print("@ Data        -->", basename(os.readlink(DATASET_DATA)))
+            print("@ bkg scale   -->", basename(os.readlink(SCALE_BKG)))
             print(f"@ Lumi set as --> {LUMI}/pb")
             print('+'*50)
 
@@ -80,8 +80,8 @@ class SigDatasetMapLoader:
         if debug:
             print("SigDatasetMapLoader loading...")
             print("+"*80)
-            print("@ 4mu   / scale -->", basename(DATASET_SIG_4MU), '/', basename(SCALE_SIG_4MU))
-            print("@ 2mu2e / scale -->", basename(DATASET_SIG_2MU2E), '/', basename(SCALE_SIG_2MU2E))
+            print("@ 4mu   / scale -->", basename(os.readlink(DATASET_SIG_4MU)), '/', basename(os.readlink(SCALE_SIG_4MU)))
+            print("@ 2mu2e / scale -->", basename(os.readlink(DATASET_SIG_2MU2E)), '/', basename(os.readlink(SCALE_SIG_2MU2E)))
             print(f"@ Lumi set as   --> {LUMI}/pb")
             print("+"*80)
 

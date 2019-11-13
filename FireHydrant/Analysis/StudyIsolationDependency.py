@@ -12,6 +12,9 @@ from coffea import hist
 from coffea.analysis_objects import JaggedCandidateArray
 from FireHydrant.Analysis.DatasetMapLoader import (DatasetMapLoader,
                                                    SigDatasetMapLoader)
+from FireHydrant.Tools.correction import (get_nlo_weight_function,
+                                          get_pu_weights_function,
+                                          get_ttbar_weight)
 from FireHydrant.Tools.metfilter import MetFilters
 from FireHydrant.Tools.trigger import Triggers
 
@@ -50,12 +53,20 @@ class LeptonjetIsoProcessor(processor.ProcessorABC):
             'all05': processor.column_accumulator(np.zeros(shape=(0,))),
             'nopu05': processor.column_accumulator(np.zeros(shape=(0,))),
             'dbeta': processor.column_accumulator(np.zeros(shape=(0,))),
+            'all05w': processor.column_accumulator(np.zeros(shape=(0,))),
+            'nopu05w': processor.column_accumulator(np.zeros(shape=(0,))),
+            'dbetaw': processor.column_accumulator(np.zeros(shape=(0,))),
             'pt': processor.column_accumulator(np.zeros(shape=(0,))),
             'eta': processor.column_accumulator(np.zeros(shape=(0,))),
             'wgt': processor.column_accumulator(np.zeros(shape=(0,))),
             'ljtype': processor.column_accumulator(np.zeros(shape=(0,))),
             'channel': processor.column_accumulator(np.zeros(shape=(0,))),
         })
+
+        self.pucorrs = get_pu_weights_function()
+        ## NOT applied for now
+        self.nlo_w = get_nlo_weight_function('w')
+        self.nlo_z = get_nlo_weight_function('z')
 
     @property
     def accumulator(self):
@@ -68,8 +79,10 @@ class LeptonjetIsoProcessor(processor.ProcessorABC):
         dataset = df['dataset']
         ## construct weights ##
         wgts = processor.Weights(df.size)
-        if len(dataset)!=1:
+        if self.data_type!='data':
             wgts.add('genw', df['weight'])
+            npv = df['trueInteractionNum']
+            wgts.add('pileup', *(f(npv) for f in self.pucorrs))
 
         triggermask = np.logical_or.reduce([df[t] for t in Triggers])
         wgts.add('trigger', triggermask)
@@ -145,6 +158,9 @@ class LeptonjetIsoProcessor(processor.ProcessorABC):
         output['all05'] += processor.column_accumulator(dileptonjets.pfisoAll05.flatten())
         output['nopu05'] += processor.column_accumulator(dileptonjets.pfisoNopu05.flatten())
         output['dbeta'] += processor.column_accumulator(dileptonjets.pfisoDbeta.flatten())
+        output['all05w'] += processor.column_accumulator((dileptonjets.pfisoAll05/dileptonjets.ncands).flatten())
+        output['nopu05w'] += processor.column_accumulator((dileptonjets.pfisoNopu05/dileptonjets.ncands).flatten())
+        output['dbetaw'] += processor.column_accumulator((dileptonjets.pfisoDbeta/dileptonjets.ncands).flatten())
         output['pt'] += processor.column_accumulator(dileptonjets.pt.flatten())
         output['eta'] += processor.column_accumulator(dileptonjets.eta.flatten())
         output['wgt'] += processor.column_accumulator((dileptonjets.pt.ones_like()*wgt).flatten())
@@ -167,15 +183,19 @@ def root_filling(output, datatype):
             for iso in ['all05', 'nopu05', 'dbeta']:
                 key = f'{chan}_{ljtype}_{iso}'
                 hprofs_pt[key] = ROOT.TProfile(f'{datatype}-pt__{key}', ';pT [GeV];isolation', 100, 0, maxPt, 0, 1)
+                hprofs_pt[key+'w'] = ROOT.TProfile(f'{datatype}-pt__{key}w', ';pT [GeV];isolation', 100, 0, maxPt, 0, 1)
                 hprofs_eta[key] = ROOT.TProfile(f'{datatype}-eta__{key}', ';eta;isolation', 50, -2.5, 2.5, 0, 1)
 
     CHANNEL = {1: '2mu2e', 2: '4mu'}
     LJTYPE = {1: 'mu', 2: 'egm'}
 
-    for all05_, nopu05_, dbeta_, pt_, eta_, wgt_, ljtype_, chan_ in np.nditer([
+    for all05_, nopu05_, dbeta_, all05w_, nopu05w_, dbetaw_, pt_, eta_, wgt_, ljtype_, chan_ in np.nditer([
         output['all05'].value,
         output['nopu05'].value,
         output['dbeta'].value,
+        output['all05w'].value,
+        output['nopu05w'].value,
+        output['dbetaw'].value,
         output['pt'].value,
         output['eta'].value,
         output['wgt'].value,
@@ -187,6 +207,10 @@ def root_filling(output, datatype):
         hprofs_pt[f'{key_}_all05'].Fill(pt_, all05_, wgt_)
         hprofs_pt[f'{key_}_nopu05'].Fill(pt_, nopu05_, wgt_)
         hprofs_pt[f'{key_}_dbeta'].Fill(pt_, dbeta_, wgt_)
+
+        hprofs_pt[f'{key_}_all05w'].Fill(pt_, all05w_, wgt_)
+        hprofs_pt[f'{key_}_nopu05w'].Fill(pt_, nopu05w_, wgt_)
+        hprofs_pt[f'{key_}_dbetaw'].Fill(pt_, dbetaw_, wgt_)
 
         hprofs_eta[f'{key_}_all05'].Fill(eta_, all05_, wgt_)
         hprofs_eta[f'{key_}_nopu05'].Fill(eta_, nopu05_, wgt_)
@@ -307,7 +331,12 @@ if __name__ == "__main__":
         profs = [hprofs_pt['sig'][k], hprofs_pt['bkg'][k], hprofs_pt['data'][k]]
         for i, h in enumerate(profs):
             h.SetLineColor(COLORS[i])
-            h.GetYaxis().SetRangeUser(0, 0.8)
+            if 'all05' in k:
+                h.GetYaxis().SetRangeUser(0, 0.8)
+            if 'nopu05' in k:
+                h.GetYaxis().SetRangeUser(0, 0.5)
+            if 'dbeta' in k:
+                h.GetYaxis().SetRangeUser(0, 0.3)
             if i==0: h.Draw()
             else: h.Draw('same')
             ROOT.gPad.Update() # this is needed, otherwise `FindObject('stats')` would return null ptr.

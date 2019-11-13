@@ -160,10 +160,10 @@ class LeptonJetIsoProcessor(processor.ProcessorABC):
         output['ljpfiso'].fill(dataset=dataset, lj0iso=lj0[channel_==2].pfisoDbeta.flatten(), lj1iso=lj1[channel_==2].pfisoDbeta.flatten(), weight=wgt[channel_==2], channel='4mu', isotype='dbeta', njet=ak4jets.counts[channel_==2])
 
         ## 2mu2e
-        dileptonjets_2mu2e = dileptonjets[channel_==1]
-        egm_2mu2e = dileptonjets_2mu2e[dileptonjets_2mu2e.iseltype]
+        leptonjets_2mu2e = leptonjets_[channel_==1]
+        egm_2mu2e = leptonjets_2mu2e[leptonjets_2mu2e.iseltype]
         egm_2mu2e = egm_2mu2e[egm_2mu2e.pt.argmax()]
-        mu_2mu2e = dileptonjets_2mu2e[dileptonjets_2mu2e.ismutype]
+        mu_2mu2e = leptonjets_2mu2e[leptonjets_2mu2e.ismutype]
         mu_2mu2e = mu_2mu2e[mu_2mu2e.pt.argmax()]
         output['ljpfiso'].fill(dataset=dataset, lj0iso=egm_2mu2e.pfisoAll05.flatten(), lj1iso=mu_2mu2e.pfisoAll05.flatten(), weight=wgt[channel_==1], channel='2mu2e', isotype='all05', njet=ak4jets.counts[channel_==1])
         output['ljpfiso'].fill(dataset=dataset, lj0iso=egm_2mu2e.pfisoNopu05.flatten(), lj1iso=mu_2mu2e.pfisoNopu05.flatten(), weight=wgt[channel_==1], channel='2mu2e', isotype='nopu05', njet=ak4jets.counts[channel_==1])
