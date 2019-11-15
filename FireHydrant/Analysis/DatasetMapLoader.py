@@ -93,7 +93,7 @@ class SigDatasetMapLoader:
         elif which == "4mu":
             res.update(self.fSig4mu)
         elif which == "2mu2e":
-            res.update(self.fSig4mu)
+            res.update(self.fSig2mu2e)
         elif which == "simple":
             res.update({
                 '4mu/mXX-100_mA-5_lxy-300': self.fSig4mu['mXX-100_mA-5_lxy-300'],
@@ -134,9 +134,9 @@ class SigDatasetMapLoader:
         else:
             raise ValueError("`which` can only be all/4mu/2mu2e/simple.")
 
-        res = {k: self.fLumi/1e3 * res[k] for k in res}
+        scaled = {k: self.fLumi/1e3 * v for k, v in res.items()}
 
-        return res
+        return scaled
 
     def fetch(self, which="all"):
         return self.get_datasets(which), self.get_scales(which)
