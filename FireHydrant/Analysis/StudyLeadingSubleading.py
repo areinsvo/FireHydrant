@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-leptonjet leading/subleading pT, eta
+leptonjet leading/subleading pT
 """
 import argparse
 
@@ -12,6 +12,9 @@ from coffea import hist
 from coffea.analysis_objects import JaggedCandidateArray
 from FireHydrant.Analysis.DatasetMapLoader import (DatasetMapLoader,
                                                    SigDatasetMapLoader)
+from FireHydrant.Tools.correction import (get_nlo_weight_function,
+                                          get_pu_weights_function,
+                                          get_ttbar_weight)
 from FireHydrant.Tools.metfilter import MetFilters
 from FireHydrant.Tools.trigger import Triggers
 
@@ -20,7 +23,7 @@ plt.rcParams["savefig.dpi"] = 120
 plt.rcParams["savefig.bbox"] = "tight"
 
 
-parser = argparse.ArgumentParser(description="leptonjet leading/subleading pt, eta")
+parser = argparse.ArgumentParser(description="leptonjet leading/subleading pt")
 parser.add_argument("--sync", action='store_true', help="issue rsync command to sync plots folder to lxplus web server")
 args = parser.parse_args()
 
@@ -29,26 +32,29 @@ bkgDS, bkgMAP, bkgSCALE = dml.fetch('bkg')
 dataDS, dataMAP = dml.fetch('data')
 
 sdml = SigDatasetMapLoader()
-sigDS, sigSCALE = sdml.fetch('simple')
+sigDS_2mu2e, sigSCALE_2mu2e = sdml.fetch('2mu2e')
+sigDS_4mu, sigSCALE_4mu = sdml.fetch('4mu')
 
 
 """Leptonjet leading/subleading pT, eta"""
 class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
-    def __init__(self, dphi_control=False, data_type='bkg'):
-        self.dphi_control = dphi_control
+    def __init__(self, region='SR', data_type='bkg'):
+        self.region = region
         self.data_type = data_type
 
         dataset_axis = hist.Cat('dataset', 'dataset')
         pt_axis = hist.Bin('pt', '$p_T$ [GeV]', 100, 0, 200)
-        eta_axis = hist.Bin('eta', 'eta', 100, -2.5, 2.5)
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
 
         self._accumulator = processor.dict_accumulator({
             'pt0': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
             'pt1': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
-            'eta0': hist.Hist('Counts', dataset_axis, eta_axis, channel_axis),
-            'eta1': hist.Hist('Counts', dataset_axis, eta_axis, channel_axis),
         })
+
+        self.pucorrs = get_pu_weights_function()
+        ## NOT applied for now
+        self.nlo_w = get_nlo_weight_function('w')
+        self.nlo_z = get_nlo_weight_function('z')
 
     @property
     def accumulator(self):
@@ -59,11 +65,12 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         if df.size==0: return output
 
         dataset = df['dataset']
-
         ## construct weights ##
         wgts = processor.Weights(df.size)
-        if len(dataset)!=1:
+        if self.data_type!='data':
             wgts.add('genw', df['weight'])
+            npv = df['trueInteractionNum']
+            wgts.add('pileup', *(f(npv) for f in self.pucorrs))
 
         triggermask = np.logical_or.reduce([df[t] for t in Triggers])
         wgts.add('trigger', triggermask)
@@ -123,20 +130,24 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         isControl = (np.abs(lj0.p4.delta_phi(lj1.p4))<np.pi/2).flatten()
 
         ## __isControl__
-        if self.dphi_control:
-            leptonjets_ = dileptonjets[isControl]
+        if self.region=='CR':
+            dileptonjets = dileptonjets[isControl]
             wgt = wgt[isControl]
             lj0 = lj0[isControl]
             lj1 = lj1[isControl]
             channel_ = channel_[isControl]
+        elif self.region=='SR':
+            dileptonjets = dileptonjets[~isControl]
+            wgt = wgt[~isControl]
+            lj0 = lj0[~isControl]
+            lj1 = lj1[~isControl]
+            channel_ = channel_[~isControl]
         else:
-            leptonjets_ = dileptonjets
-        if leptonjets_.size==0: return output
+            dileptonjets = dileptonjets
+        if dileptonjets.size==0: return output
 
         output['pt0'].fill(dataset=dataset, pt=lj0.pt.flatten(), channel=channel_, weight=wgt)
         output['pt1'].fill(dataset=dataset, pt=lj1.pt.flatten(), channel=channel_, weight=wgt)
-        output['eta0'].fill(dataset=dataset, eta=lj0.eta.flatten(), channel=channel_, weight=wgt)
-        output['eta1'].fill(dataset=dataset, eta=lj1.eta.flatten(), channel=channel_, weight=wgt)
 
         return output
 
@@ -152,34 +163,50 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
                 accumulator[k] = accumulator[k].group("dataset",
                                                     hist.Cat("cat", "datasets",),
                                                     dataMAP)
-            if self.data_type == 'sig':
-                accumulator[k].scale(sigSCALE, axis='dataset')
+            if self.data_type == 'sig-2mu2e':
+                accumulator[k].scale(sigSCALE_2mu2e, axis='dataset')
+            if self.data_type == 'sig-4mu':
+                accumulator[k].scale(sigSCALE_4mu, axis='dataset')
+
         return accumulator
 
 
-def plot_leadSublead(histo, varname, datatype):
+def filterSigDS(origds):
+    """
+    filter a complete signal DS map with some condition
 
-    h_2mu2e = histo.integrate('channel', slice(1,2))
-    h_4mu = histo.integrate('channel', slice(2,3))
+    :param dict origds: original signal dataset map
+    :return: filtered signal dataset dict
+    :rtype: dict
+    """
+    res = {}
+    for k in origds:
+        param = k.split('_')
+        mxx = float(param[0].split('-')[-1])
+        if mxx > 300: continue
+        res[k] = origds[k]
+    return res
 
-    fig, axes = plt.subplots(1,2,figsize=(14,5))
-    if datatype == 'sig':
-        hist.plot1d(h_2mu2e, overlay='dataset', ax=axes[0], density=True)
-        hist.plot1d(h_4mu, overlay='dataset', ax=axes[1], density=True)
-    if datatype == 'bkg':
-        hist.plot1d(h_2mu2e, overlay='cat', ax=axes[0], density=True)
-        hist.plot1d(h_4mu, overlay='cat', ax=axes[1], density=True)
-    if datatype == 'data':
-        hist.plot1d(h_2mu2e.sum('cat'), ax=axes[0], density=True)
-        hist.plot1d(h_4mu.sum('cat'), ax=axes[1], density=True)
 
-    axes[0].set_title(f'[2mu2e] leptonJet {varname}', x=0.0, ha="left")
-    axes[1].set_title(f'[4mu] leptonJet {varname}', x=0.0, ha="left")
-    for ax in axes:
-        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
-        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
-    return fig, axes
+def groupHandleLabel(ax):
+    """
+    group handle and labels in the same axes.
+    `ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=2)`
+    
+    :param matplotlib.pyplot.axes ax: axes
+    :return: grouped handles and labels
+    :rtype: tuple
+    """
+    from collections import defaultdict
+    hl_ = defaultdict(list)
+    for h, l in zip(*ax.get_legend_handles_labels()):
+        hl_[l].append(h)
+    l2 = hl_.keys()
+    h2 = list()
+    for h_ in hl_.values():
+        h2.append(tuple(h_))
+    return h2, l2
+
 
 
 if __name__ == "__main__":
@@ -189,35 +216,182 @@ if __name__ == "__main__":
     outdir = join(os.getenv('FH_BASE'), "Imgs", __file__.split('.')[0])
     if not isdir(outdir): os.makedirs(outdir)
 
+    fill_opts = {
+        'edgecolor': (0,0,0,0.3),
+        'alpha': 0.8
+    }
+    error_opts = {
+        'label':'Stat. Unc.',
+        'hatch':'xxx',
+        'facecolor':'none',
+        'edgecolor':(0,0,0,.5),
+        'linewidth': 0
+    }
+    data_err_opts = {
+        'linestyle':'none',
+        'marker': '.',
+        'markersize': 10.,
+        'color':'k',
+        'elinewidth': 1,
+        'emarker': '_'
+    }
+
     outputs = {}
     outputs['bkg'] = processor.run_uproot_job(bkgDS,
                                   treename='ffNtuplizer/ffNtuple',
-                                  processor_instance=LeptonjetLeadSubleadProcessor(data_type='bkg'),
-                                  executor=processor.futures_executor,
-                                  executor_args=dict(workers=12, flatten=True),
-                                  chunksize=500000,
-                                 )
-    outputs['data'] = processor.run_uproot_job(dataDS,
-                                  treename='ffNtuplizer/ffNtuple',
-                                  processor_instance=LeptonjetLeadSubleadProcessor(dphi_control=True, data_type='data'),
-                                  executor=processor.futures_executor,
-                                  executor_args=dict(workers=12, flatten=True),
-                                  chunksize=500000,
-                                 )
-    outputs['sig'] = processor.run_uproot_job(sigDS,
-                                  treename='ffNtuplizer/ffNtuple',
-                                  processor_instance=LeptonjetLeadSubleadProcessor(dphi_control=False, data_type='sig'),
+                                  processor_instance=LeptonjetLeadSubleadProcessor(region='SR', data_type='bkg'),
                                   executor=processor.futures_executor,
                                   executor_args=dict(workers=12, flatten=True),
                                   chunksize=500000,
                                  )
 
-    for t, output in outputs.items():
-        for k, h in output.items():
-            fig, axes = plot_leadSublead(h, k, t)
-            fig.savefig(join(outdir, f"{k}__{t}.png"))
-            fig.savefig(join(outdir, f"{k}__{t}.pdf"))
-            plt.close(fig)
+    outputs['sig-2mu2e'] = processor.run_uproot_job(filterSigDS(sigDS_2mu2e),
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetLeadSubleadProcessor(region='SR', data_type='sig-2mu2e'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    outputs['sig-4mu'] = processor.run_uproot_job(filterSigDS(sigDS_4mu),
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetLeadSubleadProcessor(region='SR', data_type='sig-4mu'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    outputs['data'] = processor.run_uproot_job(dataDS,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetLeadSubleadProcessor(region='CR', data_type='data'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    ## CHANNEL - 2mu2e
+    #### leading
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgpt0 = outputs['bkg']['pt0'].integrate('channel', slice(1,2))
+    hist.plot1d(bkgpt0, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigpt0 = outputs['sig-2mu2e']['pt0'].integrate('channel', slice(1,2))
+    hist.plot1d(sigpt0, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datapt0 = outputs['data']['pt0'].integrate('channel', slice(1,2))
+    hist.plot1d(datapt0, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] leptonjet leading pT', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] leptonjet leading pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'pt0_2mu2e.png'))
+    fig.savefig(join(outdir, 'pt0_2mu2e.pdf'))
+    plt.close(fig)
+
+    #### subleading
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgpt1 = outputs['bkg']['pt1'].integrate('channel', slice(1,2))
+    hist.plot1d(bkgpt1, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigpt1 = outputs['sig-2mu2e']['pt1'].integrate('channel', slice(1,2))
+    hist.plot1d(sigpt1, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datapt1 = outputs['data']['pt1'].integrate('channel', slice(1,2))
+    hist.plot1d(datapt1, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] leptonjet subleading pT', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] leptonjet subleading pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'pt1_2mu2e.png'))
+    fig.savefig(join(outdir, 'pt1_2mu2e.pdf'))
+    plt.close(fig)
+
+
+    ## CHANNEL - 4mu
+    #### leading
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgpt0 = outputs['bkg']['pt0'].integrate('channel', slice(2,3))
+    hist.plot1d(bkgpt0, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigpt0 = outputs['sig-4mu']['pt0'].integrate('channel', slice(2,3))
+    hist.plot1d(sigpt0, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datapt0 = outputs['data']['pt0'].integrate('channel', slice(2,3))
+    hist.plot1d(datapt0, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[4mu|SR] leptonjet leading pT', x=0.0, ha="left")
+    axes[1].set_title('[4mu|CR] leptonjet leading pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'pt0_4mu.png'))
+    fig.savefig(join(outdir, 'pt0_4mu.pdf'))
+    plt.close(fig)
+
+    #### subleading
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgpt1 = outputs['bkg']['pt1'].integrate('channel', slice(2,3))
+    hist.plot1d(bkgpt1, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigpt1 = outputs['sig-4mu']['pt1'].integrate('channel', slice(2,3))
+    hist.plot1d(sigpt1, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datapt1 = outputs['data']['pt1'].integrate('channel', slice(2,3))
+    hist.plot1d(datapt1, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[4mu|SR] leptonjet subleading pT', x=0.0, ha="left")
+    axes[1].set_title('[4mu|CR] leptonjet subleading pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'pt1_4mu.png'))
+    fig.savefig(join(outdir, 'pt1_4mu.pdf'))
+    plt.close(fig)
+
 
     if args.sync:
         webdir = 'wsi@lxplus.cern.ch:/eos/user/w/wsi/www/public/firehydrant'
