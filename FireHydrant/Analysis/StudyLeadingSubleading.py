@@ -49,6 +49,7 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         self._accumulator = processor.dict_accumulator({
             'pt0': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
             'pt1': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
+            'ptegm': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis), # leading EGM-type for 2mu2e channel
         })
 
         self.pucorrs = get_pu_weights_function()
@@ -148,6 +149,10 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
 
         output['pt0'].fill(dataset=dataset, pt=lj0.pt.flatten(), channel=channel_, weight=wgt)
         output['pt1'].fill(dataset=dataset, pt=lj1.pt.flatten(), channel=channel_, weight=wgt)
+
+        egm_lj = dileptonjets[dileptonjets.iseltype]
+        egm_lj = egm_lj[egm_lj.pt.argmax()]
+        output['ptegm'].fill(dataset=dataset, pt=egm_lj.pt.flatten(), channel=channel_[egm_lj.counts!=0], weight=wgt[egm_lj.counts!=0])
 
         return output
 
@@ -329,6 +334,37 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'pt1_2mu2e.png'))
     fig.savefig(join(outdir, 'pt1_2mu2e.pdf'))
     plt.close(fig)
+
+    #### EGM-type
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgptegm = outputs['bkg']['ptegm'].integrate('channel', slice(1,2))
+    hist.plot1d(bkgptegm, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigptegm = outputs['sig-2mu2e']['ptegm'].integrate('channel', slice(1,2))
+    hist.plot1d(sigptegm, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    dataptegm = outputs['data']['ptegm'].integrate('channel', slice(1,2))
+    hist.plot1d(dataptegm, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] EGM-type leptonjet pT', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] EGM-type leptonjet pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'ptegm_2mu2e.png'))
+    fig.savefig(join(outdir, 'ptegm_2mu2e.pdf'))
+    plt.close(fig)
+
 
 
     ## CHANNEL - 4mu
