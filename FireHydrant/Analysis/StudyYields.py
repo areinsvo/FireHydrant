@@ -136,7 +136,12 @@ class LeptonjetProcessor(processor.ProcessorABC):
             np.ones_like(wgt).astype(bool),                        # all
             (np.abs(lj0.p4.delta_phi(lj1.p4))>np.pi/2).flatten(),  # dphi > pi/2
             ak4jets.counts<4,                                      # N(jets) < 4
+            (~channel_2mu2e.astype(bool)) | (channel_2mu2e.astype(bool)&(((lj0.iseltype)&(lj0.pt>40)) | ((lj1.iseltype)&(lj1.pt>40))).flatten() ), # EGMpt0>40
+            ( (lj0.ismutype&(lj0.pt>40)) | ((~lj0.ismutype)&(lj1.ismutype&(lj1.pt>40))) ).flatten(), # Mupt0>40
         ]
+
+        if self.data_type == 'data':
+            cuts[1] = ~cuts[1]
 
         for i, c in enumerate(itertools.accumulate(cuts, np.logical_and)):
             output['count'].fill(dataset=dataset, cnt=np.ones_like(wgt[c])*i, weight=wgt[c], channel=channel_[c])
@@ -187,67 +192,83 @@ if __name__ == "__main__":
     CUTNAMES = {
         0: '>=2lj',
         1: 'dphi>pi/2',
-        2: 'Njets<4'
+        2: 'Njets<4',
+        3: 'EGM0pt>40',
+        4: 'Mu0pt>40'
     }
 
     YieldsDf = {}
 
-    ## CHANNEL - 2mu2e
-    outputs = OrderedDict()
-    out_ = processor.run_uproot_job(sigDS_2mu2e,
+    out_sig2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                   treename='ffNtuplizer/ffNtuple',
                                   processor_instance=LeptonjetProcessor(data_type='sig-2mu2e'),
                                   executor=processor.futures_executor,
                                   executor_args=dict(workers=12, flatten=True),
                                   chunksize=500000,
                                  )
-    h_ = out_['count'].integrate('channel', slice(1,2))
-    d_ = { k[0]: v for k, v in h_.values().items() }
-    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
 
-    out_ = processor.run_uproot_job(bkgDS,
-                                  treename='ffNtuplizer/ffNtuple',
-                                  processor_instance=LeptonjetProcessor(data_type='bkg'),
-                                  executor=processor.futures_executor,
-                                  executor_args=dict(workers=12, flatten=True),
-                                  chunksize=500000,
-                                 )
-    h_ = out_['count'].integrate('channel', slice(1,2))
-    outputs.update( { k[0]: v for k, v in h_.values().items() } )
-
-
-    df_ = pd.DataFrame(outputs).transpose()
-    for k, n in CUTNAMES.items():
-        df_.rename(columns={k: n}, inplace=True)
-    YieldsDf['2mu2e'] = df_
-
-    ## CHANNEL - 4mu
-    outputs = OrderedDict()
-    out_ = processor.run_uproot_job(sigDS_4mu,
+    out_sig4mu = processor.run_uproot_job(sigDS_4mu,
                                   treename='ffNtuplizer/ffNtuple',
                                   processor_instance=LeptonjetProcessor(data_type='sig-4mu'),
                                   executor=processor.futures_executor,
                                   executor_args=dict(workers=12, flatten=True),
                                   chunksize=500000,
                                  )
-    h_ = out_['count'].integrate('channel', slice(2, 3))
-    d_ = { k[0]: v for k, v in h_.values().items() }
-    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
 
-    out_ = processor.run_uproot_job(bkgDS,
+    out_bkg = processor.run_uproot_job(bkgDS,
                                   treename='ffNtuplizer/ffNtuple',
                                   processor_instance=LeptonjetProcessor(data_type='bkg'),
                                   executor=processor.futures_executor,
                                   executor_args=dict(workers=12, flatten=True),
                                   chunksize=500000,
                                  )
-    h_ = out_['count'].integrate('channel', slice(2, 3))
+
+    out_data = processor.run_uproot_job(dataDS,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetProcessor(data_type='data'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    ## CHANNEL - 2mu2e
+    outputs = OrderedDict()
+    h_ = out_sig2mu2e['count'].integrate('channel', slice(1,2))
+    d_ = { k[0]: v for k, v in h_.values().items() }
+    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
+
+    h_ = out_bkg['count'].integrate('channel', slice(1,2))
+    outputs.update( { k[0]: v for k, v in h_.values().items() } )
+
+    h_ = out_data['count'].integrate('channel', slice(1,2))
     outputs.update( { k[0]: v for k, v in h_.values().items() } )
 
     df_ = pd.DataFrame(outputs).transpose()
     for k, n in CUTNAMES.items():
         df_.rename(columns={k: n}, inplace=True)
+    df_.rename(index={'data': 'data CR(~dphi)'}, inplace=True)
+    YieldsDf['2mu2e'] = df_
+
+
+    ## CHANNEL - 4mu
+    outputs = OrderedDict()
+    h_ = out_sig4mu['count'].integrate('channel', slice(2, 3))
+    d_ = { k[0]: v for k, v in h_.values().items() }
+    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
+
+    h_ = out_bkg['count'].integrate('channel', slice(2, 3))
+    outputs.update( { k[0]: v for k, v in h_.values().items() } )
+
+    h_ = out_data['count'].integrate('channel', slice(2, 3))
+    outputs.update( { k[0]: v for k, v in h_.values().items() } )
+
+    df_ = pd.DataFrame(outputs).transpose()
+    for k, n in CUTNAMES.items():
+        df_.rename(columns={k: n}, inplace=True)
+    df_.rename(index={'data': 'data CR(~dphi)'}, inplace=True)
     YieldsDf['4mu'] = df_
+
+
 
     with open(f'{outdir}/readme.txt', 'w') as outf:
         outf.write('+'*50+'\n')
