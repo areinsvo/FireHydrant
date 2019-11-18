@@ -44,12 +44,15 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
 
         dataset_axis = hist.Cat('dataset', 'dataset')
         pt_axis = hist.Bin('pt', '$p_T$ [GeV]', 100, 0, 200)
+        invm_axis = hist.Bin('invm', 'mass [GeV]', 100, 0, 200)
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
 
         self._accumulator = processor.dict_accumulator({
             'pt0': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
             'pt1': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis),
             'ptegm': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis), # leading EGM-type for 2mu2e channel
+            'ptmu': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis), # leading mu-type for 2mu2e channel
+            'invm': hist.Hist('Counts', dataset_axis, invm_axis, channel_axis),
         })
 
         self.pucorrs = get_pu_weights_function()
@@ -107,10 +110,17 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         nmu = ((ljdautype==3)|(ljdautype==8)).sum()
         leptonjets.add_attributes(ismutype=(nmu>=2), iseltype=(nmu==0))
 
+        leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))]
+
         ## __ twoleptonjets__
-        twoleptonjets = leptonjets.counts>=2
+        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)
         dileptonjets = leptonjets[twoleptonjets]
         wgt = weight[twoleptonjets]
+
+        ## __Mu-type pt0>40__
+        mask_ = dileptonjets[dileptonjets.ismutype].pt.max()>40
+        dileptonjets = dileptonjets[mask_]
+        wgt = wgt[mask_]
 
         if dileptonjets.size==0: return output
         lj0 = dileptonjets[dileptonjets.pt.argmax()]
@@ -149,10 +159,15 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
 
         output['pt0'].fill(dataset=dataset, pt=lj0.pt.flatten(), channel=channel_, weight=wgt)
         output['pt1'].fill(dataset=dataset, pt=lj1.pt.flatten(), channel=channel_, weight=wgt)
+        output['invm'].fill(dataset=dataset, invm=(lj0.p4+lj1.p4).mass.flatten(), channel=channel_, weight=wgt)
 
         egm_lj = dileptonjets[dileptonjets.iseltype]
         egm_lj = egm_lj[egm_lj.pt.argmax()]
         output['ptegm'].fill(dataset=dataset, pt=egm_lj.pt.flatten(), channel=channel_[egm_lj.counts!=0], weight=wgt[egm_lj.counts!=0])
+
+        mu_lj = dileptonjets[dileptonjets.ismutype]
+        mu_lj = mu_lj[mu_lj.pt.argmax()]
+        output['ptmu'].fill(dataset=dataset, pt=mu_lj.pt.flatten(), channel=channel_[mu_lj.counts!=0], weight=wgt[mu_lj.counts!=0])
 
         return output
 
@@ -197,7 +212,7 @@ def groupHandleLabel(ax):
     """
     group handle and labels in the same axes.
     `ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=2)`
-    
+
     :param matplotlib.pyplot.axes ax: axes
     :return: grouped handles and labels
     :rtype: tuple
@@ -335,6 +350,36 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'pt1_2mu2e.pdf'))
     plt.close(fig)
 
+    #### invM(lj0, lj1)
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkginvm = outputs['bkg']['invm'].integrate('channel', slice(1,2))
+    hist.plot1d(bkginvm, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    siginvm = outputs['sig-2mu2e']['invm'].integrate('channel', slice(1,2))
+    hist.plot1d(siginvm, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datainvm = outputs['data']['invm'].integrate('channel', slice(1,2))
+    hist.plot1d(datainvm, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] leptonjet pair invM', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] leptonjet pair invM', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'invm_2mu2e.png'))
+    fig.savefig(join(outdir, 'invm_2mu2e.pdf'))
+    plt.close(fig)
+
     #### EGM-type
     fig, axes = plt.subplots(1,2,figsize=(16,6))
     fig.subplots_adjust(wspace=0.15)
@@ -360,11 +405,42 @@ if __name__ == "__main__":
         ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
         ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
         ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+        ax.vlines(40, 1e-6, 1e4, linestyles='dashed')
 
     fig.savefig(join(outdir, 'ptegm_2mu2e.png'))
     fig.savefig(join(outdir, 'ptegm_2mu2e.pdf'))
     plt.close(fig)
 
+    #### mu-type
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgptmu = outputs['bkg']['ptmu'].integrate('channel', slice(1,2))
+    hist.plot1d(bkgptmu, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigptmu = outputs['sig-2mu2e']['ptmu'].integrate('channel', slice(1,2))
+    hist.plot1d(sigptmu, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    dataptmu = outputs['data']['ptmu'].integrate('channel', slice(1,2))
+    hist.plot1d(dataptmu, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] mu-type leptonjet pT', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] mu-type leptonjet pT', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+        ax.vlines(40, 1e-6, 1e4, linestyles='dashed')
+
+    fig.savefig(join(outdir, 'ptmu_2mu2e.png'))
+    fig.savefig(join(outdir, 'ptmu_2mu2e.pdf'))
+    plt.close(fig)
 
 
     ## CHANNEL - 4mu
@@ -426,6 +502,36 @@ if __name__ == "__main__":
 
     fig.savefig(join(outdir, 'pt1_4mu.png'))
     fig.savefig(join(outdir, 'pt1_4mu.pdf'))
+    plt.close(fig)
+
+    #### invM(lj0, lj1)
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkginvm = outputs['bkg']['invm'].integrate('channel', slice(2,3))
+    hist.plot1d(bkginvm, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    siginvm = outputs['sig-2mu2e']['invm'].integrate('channel', slice(2,3))
+    hist.plot1d(siginvm, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datainvm = outputs['data']['invm'].integrate('channel', slice(2,3))
+    hist.plot1d(datainvm, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[4mu|SR] leptonjet pair invM', x=0.0, ha="left")
+    axes[1].set_title('[4mu|CR] leptonjet pair invM', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        ax.set_yscale('log')
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'invm_4mu.png'))
+    fig.savefig(join(outdir, 'invm_4mu.pdf'))
     plt.close(fig)
 
 
