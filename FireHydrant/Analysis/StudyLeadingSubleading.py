@@ -110,7 +110,8 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         nmu = ((ljdautype==3)|(ljdautype==8)).sum()
         leptonjets.add_attributes(ismutype=(nmu>=2), iseltype=(nmu==0))
 
-        leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))]
+        leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))] # EGM-type lj pt > 40
+        leptonjets = leptonjets[((~leptonjets.ismutype)|(leptonjets.ismutype&(leptonjets.pt>30)))] # Mu-type lj pt > 30
 
         ## __ twoleptonjets__
         twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)
@@ -512,7 +513,7 @@ if __name__ == "__main__":
     hist.plot1d(bkginvm, overlay='cat', ax=axes[0], stack=True, overflow='over',
                 line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
 
-    siginvm = outputs['sig-2mu2e']['invm'].integrate('channel', slice(2,3))
+    siginvm = outputs['sig-4mu']['invm'].integrate('channel', slice(2,3))
     hist.plot1d(siginvm, overlay='dataset', ax=axes[0], overflow='over', clear=False)
 
     datainvm = outputs['data']['invm'].integrate('channel', slice(2,3))
