@@ -33,8 +33,9 @@ dataDS, dataMAP = dml.fetch('data')
 
 """event yields"""
 class LeptonjetProcessor(processor.ProcessorABC):
-    def __init__(self, data_type='bkg'):
+    def __init__(self, data_type='bkg', region='SR'):
         self.data_type = data_type
+        self.region = region
 
         dataset_axis = hist.Cat('dataset', 'dataset')
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
@@ -84,7 +85,10 @@ class LeptonjetProcessor(processor.ProcessorABC):
             pz=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fZ'],
             energy=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fT'],
             jetid=df['akjet_ak4PFJetsCHS_jetid'],
+            deepcsv=df['hftagscore_DeepCSV_b'],
         )
+        deepcsv_tight = np.bitwise_and(ak4jets.deepcsv, 1<<2)==(1<<2)
+        ak4jets.add_attributes(deepcsvTight=deepcsv_tight)
         ak4jets=ak4jets[ak4jets.jetid&(ak4jets.pt>20)&(np.abs(ak4jets.eta)<2.5)]
 
         leptonjets = JaggedCandidateArray.candidatesfromcounts(
@@ -136,11 +140,13 @@ class LeptonjetProcessor(processor.ProcessorABC):
             np.ones_like(wgt).astype(bool),                        # all
             (np.abs(lj0.p4.delta_phi(lj1.p4))>np.pi/2).flatten(),  # dphi > pi/2
             ak4jets.counts<4,                                      # N(jets) < 4
+            ak4jets[(ak4jets.pt>30)&(np.abs(ak4jets.eta)<2.4)&ak4jets.deepcsvTight].counts==0, # N(tightB)==0
             (~channel_2mu2e.astype(bool)) | (channel_2mu2e.astype(bool)&(((lj0.iseltype)&(lj0.pt>40)) | ((lj1.iseltype)&(lj1.pt>40))).flatten() ), # EGMpt0>40
             ( (lj0.ismutype&(lj0.pt>40)) | ((~lj0.ismutype)&(lj1.ismutype&(lj1.pt>40))) ).flatten(), # Mupt0>40
+            ( (~(channel_==2)) | (channel_==2)&((lj1.pt>30).flatten()) ), # Mupt1>30
         ]
 
-        if self.data_type == 'data':
+        if self.region == 'CR':
             cuts[1] = ~cuts[1]
 
         for i, c in enumerate(itertools.accumulate(cuts, np.logical_and)):
@@ -189,15 +195,19 @@ if __name__ == "__main__":
     outdir = join(os.getenv('FH_BASE'), "Imgs", splitext(__file__)[0])
     if not isdir(outdir): os.makedirs(outdir)
 
+    YieldsDf = {}
+
+    ## SR
+
     CUTNAMES = {
         0: '>=2lj',
         1: 'dphi>pi/2',
         2: 'Njets<4',
-        3: 'EGM0pt>40',
-        4: 'Mu0pt>40'
+        3: 'NtightB==0',
+        4: 'EGM0pt>40',
+        5: 'Mu0pt>40',
+        6: 'Mu1pt>30',
     }
-
-    YieldsDf = {}
 
     out_sig2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                   treename='ffNtuplizer/ffNtuple',
@@ -223,9 +233,74 @@ if __name__ == "__main__":
                                   chunksize=500000,
                                  )
 
+    ## CHANNEL - 2mu2e
+    outputs = OrderedDict()
+    h_ = out_sig2mu2e['count'].integrate('channel', slice(1,2))
+    d_ = { k[0]: v for k, v in h_.values().items() }
+    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
+
+    h_ = out_bkg['count'].integrate('channel', slice(1,2))
+    outputs.update( { k[0]: v for k, v in h_.values().items() } )
+
+    df_ = pd.DataFrame(outputs).transpose()
+    for k, n in CUTNAMES.items():
+        df_.rename(columns={k: n}, inplace=True)
+    YieldsDf['2mu2e-SR'] = df_
+
+
+    ## CHANNEL - 4mu
+    outputs = OrderedDict()
+    h_ = out_sig4mu['count'].integrate('channel', slice(2, 3))
+    d_ = { k[0]: v for k, v in h_.values().items() }
+    outputs.update( sorted(d_.items(), key=lambda t: sigsort(t[0])) )
+
+    h_ = out_bkg['count'].integrate('channel', slice(2, 3))
+    outputs.update( { k[0]: v for k, v in h_.values().items() } )
+
+    df_ = pd.DataFrame(outputs).transpose()
+    for k, n in CUTNAMES.items():
+        df_.rename(columns={k: n}, inplace=True)
+    YieldsDf['4mu-SR'] = df_
+
+    ## CR
+
+    CUTNAMES = {
+        0: '>=2lj',
+        1: 'dphi<=pi/2',
+        2: 'Njets<4',
+        3: 'NtightB==0',
+        4: 'EGM0pt>40',
+        5: 'Mu0pt>40',
+        6: 'Mu1pt>30',
+    }
+
+    out_sig2mu2e = processor.run_uproot_job(sigDS_2mu2e,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetProcessor(data_type='sig-2mu2e', region='CR'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    out_sig4mu = processor.run_uproot_job(sigDS_4mu,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetProcessor(data_type='sig-4mu', region='CR'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
+    out_bkg = processor.run_uproot_job(bkgDS,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=LeptonjetProcessor(data_type='bkg', region='CR'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=True),
+                                  chunksize=500000,
+                                 )
+
     out_data = processor.run_uproot_job(dataDS,
                                   treename='ffNtuplizer/ffNtuple',
-                                  processor_instance=LeptonjetProcessor(data_type='data'),
+                                  processor_instance=LeptonjetProcessor(data_type='data', region='CR'),
                                   executor=processor.futures_executor,
                                   executor_args=dict(workers=12, flatten=True),
                                   chunksize=500000,
@@ -246,8 +321,7 @@ if __name__ == "__main__":
     df_ = pd.DataFrame(outputs).transpose()
     for k, n in CUTNAMES.items():
         df_.rename(columns={k: n}, inplace=True)
-    df_.rename(index={'data': 'data CR(~dphi)'}, inplace=True)
-    YieldsDf['2mu2e'] = df_
+    YieldsDf['2mu2e-CR'] = df_
 
 
     ## CHANNEL - 4mu
@@ -265,21 +339,32 @@ if __name__ == "__main__":
     df_ = pd.DataFrame(outputs).transpose()
     for k, n in CUTNAMES.items():
         df_.rename(columns={k: n}, inplace=True)
-    df_.rename(index={'data': 'data CR(~dphi)'}, inplace=True)
-    YieldsDf['4mu'] = df_
-
+    YieldsDf['4mu-CR'] = df_
 
 
     with open(f'{outdir}/readme.txt', 'w') as outf:
+        outf.write('SIGNAL REGION'.center(100, '_')+'\n')
         outf.write('+'*50+'\n')
         outf.write('CHANNEL - 2mu2e'.center(50, ' ')+'\n')
         outf.write('+'*50+'\n')
-        outf.write(YieldsDf['2mu2e'].to_string())
-        outf.write('\n'*5)
+        outf.write(YieldsDf['2mu2e-SR'].to_string())
+        outf.write('\n'*3)
         outf.write('+'*50+'\n')
         outf.write('CHANNEL - 4mu'.center(50, ' ')+'\n')
         outf.write('+'*50+'\n')
-        outf.write(YieldsDf['4mu'].to_string())
+        outf.write(YieldsDf['4mu-SR'].to_string())
+        outf.write('\n'*5)
+
+        outf.write('CONTROL REGION'.center(100, '_')+'\n')
+        outf.write('+'*50+'\n')
+        outf.write('CHANNEL - 2mu2e'.center(50, ' ')+'\n')
+        outf.write('+'*50+'\n')
+        outf.write(YieldsDf['2mu2e-CR'].to_string())
+        outf.write('\n'*3)
+        outf.write('+'*50+'\n')
+        outf.write('CHANNEL - 4mu'.center(50, ' ')+'\n')
+        outf.write('+'*50+'\n')
+        outf.write(YieldsDf['4mu-CR'].to_string())
 
     print(open(f'{outdir}/readme.txt').read())
 
