@@ -3,7 +3,7 @@
 """
 # from awkward import JaggedArray
 import awkward
-
+import numpy as np
 
 def NestNestObjArrayToJagged(objarr):
     """uproot read vector<vector<number>> TBranch
@@ -22,7 +22,15 @@ def NestNestObjArrayToJagged(objarr):
 def fromNestNestIndexArray(content, nnidx):
     """indexing a JaggedArray with a two-level nested index array"""
 
-    outcontent = content[nnidx.flatten(axis=1)].flatten()
-    outnest = awkward.JaggedArray.fromoffsets(nnidx.flatten().offsets, outcontent)
-    out = awkward.JaggedArray.fromoffsets(nnidx.offsets, outnest)
-    return out
+    if np.any(nnidx.flatten(axis=1).counts):
+        try:
+            outcontent = content[nnidx.flatten(axis=1)].flatten()
+        except:
+            print('nnidx:', nnidx)
+            print('content:', content)
+            raise
+        outnest = awkward.JaggedArray.fromoffsets(nnidx.flatten().offsets, outcontent)
+        out = awkward.JaggedArray.fromoffsets(nnidx.offsets, outnest)
+        return out
+    else:
+        return nnidx

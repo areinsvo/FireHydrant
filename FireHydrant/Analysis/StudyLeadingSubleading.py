@@ -45,6 +45,7 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         dataset_axis = hist.Cat('dataset', 'dataset')
         pt_axis = hist.Bin('pt', '$p_T$ [GeV]', 100, 0, 200)
         invm_axis = hist.Bin('invm', 'mass [GeV]', 100, 0, 200)
+        mass_axis = hist.Bin('mass', 'mass [GeV]', 100, 0, 200)
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
 
         self._accumulator = processor.dict_accumulator({
@@ -53,6 +54,7 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
             'ptegm': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis), # leading EGM-type for 2mu2e channel
             'ptmu': hist.Hist('Counts', dataset_axis, pt_axis, channel_axis), # leading mu-type for 2mu2e channel
             'invm': hist.Hist('Counts', dataset_axis, invm_axis, channel_axis),
+            'massmu': hist.Hist('Counts', dataset_axis, mass_axis, channel_axis), # mass of mu-type leptonjet
         })
 
         self.pucorrs = get_pu_weights_function()
@@ -110,8 +112,8 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         nmu = ((ljdautype==3)|(ljdautype==8)).sum()
         leptonjets.add_attributes(ismutype=(nmu>=2), iseltype=(nmu==0))
 
-        leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))] # EGM-type lj pt > 40
-        leptonjets = leptonjets[((~leptonjets.ismutype)|(leptonjets.ismutype&(leptonjets.pt>30)))] # Mu-type lj pt > 30
+        # leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))] # EGM-type lj pt > 40
+        # leptonjets = leptonjets[((~leptonjets.ismutype)|(leptonjets.ismutype&(leptonjets.pt>30)))] # Mu-type lj pt > 30
 
         ## __ twoleptonjets__
         twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)
@@ -119,9 +121,9 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         wgt = weight[twoleptonjets]
 
         ## __Mu-type pt0>40__
-        mask_ = dileptonjets[dileptonjets.ismutype].pt.max()>40
-        dileptonjets = dileptonjets[mask_]
-        wgt = wgt[mask_]
+        # mask_ = dileptonjets[dileptonjets.ismutype].pt.max()>40
+        # dileptonjets = dileptonjets[mask_]
+        # wgt = wgt[mask_]
 
         if dileptonjets.size==0: return output
         lj0 = dileptonjets[dileptonjets.pt.argmax()]
@@ -167,8 +169,9 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         output['ptegm'].fill(dataset=dataset, pt=egm_lj.pt.flatten(), channel=channel_[egm_lj.counts!=0], weight=wgt[egm_lj.counts!=0])
 
         mu_lj = dileptonjets[dileptonjets.ismutype]
-        mu_lj = mu_lj[mu_lj.pt.argmax()]
+        mu_lj = mu_lj[mu_lj.pt.argmax()] # leading
         output['ptmu'].fill(dataset=dataset, pt=mu_lj.pt.flatten(), channel=channel_[mu_lj.counts!=0], weight=wgt[mu_lj.counts!=0])
+        output['massmu'].fill(dataset=dataset, mass=mu_lj.mass.flatten(), channel=channel_[mu_lj.counts!=0], weight=wgt[mu_lj.counts!=0])
 
         return output
 
@@ -209,53 +212,14 @@ def filterSigDS(origds):
     return res
 
 
-def groupHandleLabel(ax):
-    """
-    group handle and labels in the same axes.
-    `ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=2)`
-
-    :param matplotlib.pyplot.axes ax: axes
-    :return: grouped handles and labels
-    :rtype: tuple
-    """
-    from collections import defaultdict
-    hl_ = defaultdict(list)
-    for h, l in zip(*ax.get_legend_handles_labels()):
-        hl_[l].append(h)
-    l2 = hl_.keys()
-    h2 = list()
-    for h_ in hl_.values():
-        h2.append(tuple(h_))
-    return h2, l2
-
-
 
 if __name__ == "__main__":
     import os
     from os.path import join, isdir
+    from FireHydrant.Analysis.PlottingOptions import *
 
     outdir = join(os.getenv('FH_BASE'), "Imgs", __file__.split('.')[0])
     if not isdir(outdir): os.makedirs(outdir)
-
-    fill_opts = {
-        'edgecolor': (0,0,0,0.3),
-        'alpha': 0.8
-    }
-    error_opts = {
-        'label':'Stat. Unc.',
-        'hatch':'xxx',
-        'facecolor':'none',
-        'edgecolor':(0,0,0,.5),
-        'linewidth': 0
-    }
-    data_err_opts = {
-        'linestyle':'none',
-        'marker': '.',
-        'markersize': 10.,
-        'color':'k',
-        'elinewidth': 1,
-        'emarker': '_'
-    }
 
     outputs = {}
     outputs['bkg'] = processor.run_uproot_job(bkgDS,
@@ -371,8 +335,10 @@ if __name__ == "__main__":
     axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
 
     for ax in axes:
-        ax.set_yscale('log')
+        # ax.set_yscale('log')
         ax.autoscale(axis='both', tight=True)
+        left, right = ax.get_xlim()
+        ax.set_xticks(np.arange(left, right+10, 10))
         ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
         ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
         ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
@@ -412,7 +378,7 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'ptegm_2mu2e.pdf'))
     plt.close(fig)
 
-    #### mu-type
+    #### mu-type, pt
     fig, axes = plt.subplots(1,2,figsize=(16,6))
     fig.subplots_adjust(wspace=0.15)
 
@@ -441,6 +407,38 @@ if __name__ == "__main__":
 
     fig.savefig(join(outdir, 'ptmu_2mu2e.png'))
     fig.savefig(join(outdir, 'ptmu_2mu2e.pdf'))
+    plt.close(fig)
+
+    #### mu-type, mass
+    fig, axes = plt.subplots(1,2,figsize=(16,6))
+    fig.subplots_adjust(wspace=0.15)
+
+    bkgmassmu = outputs['bkg']['massmu'].integrate('channel', slice(1,2))
+    hist.plot1d(bkgmassmu, overlay='cat', ax=axes[0], stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+
+    sigmassmu = outputs['sig-2mu2e']['massmu'].integrate('channel', slice(1,2))
+    hist.plot1d(sigptmu, overlay='dataset', ax=axes[0], overflow='over', clear=False)
+
+    datamassmu = outputs['data']['massmu'].integrate('channel', slice(1,2))
+    hist.plot1d(datamassmu, overlay='cat', ax=axes[1], overflow='over', error_opts=data_err_opts)
+
+    axes[0].set_title('[2mu2e|SR] mu-type leptonjet mass', x=0.0, ha="left")
+    axes[1].set_title('[2mu2e|CR] mu-type leptonjet mass', x=0.0, ha="left")
+
+    axes[0].legend(*groupHandleLabel(axes[0]), prop={'size': 8,}, ncol=3)
+
+    for ax in axes:
+        # ax.set_yscale('log')
+        left, right = ax.get_xlim()
+        ax.set_xticks(np.arange(left, right+10, 10))
+        ax.autoscale(axis='both', tight=True)
+        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+        ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'massmu_2mu2e.png'))
+    fig.savefig(join(outdir, 'massmu_2mu2e.pdf'))
     plt.close(fig)
 
 

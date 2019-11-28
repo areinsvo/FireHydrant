@@ -17,6 +17,7 @@ from FireHydrant.Tools.correction import (get_nlo_weight_function,
                                           get_ttbar_weight)
 from FireHydrant.Tools.metfilter import MetFilters
 from FireHydrant.Tools.trigger import Triggers
+from FireHydrant.Analysis.Utils import sigsort
 
 parser = argparse.ArgumentParser(description="print sigmc/bkgmc yields")
 parser.add_argument("--sync", action='store_true', help="issue rsync command to sync plots folder to lxplus web server")
@@ -86,6 +87,7 @@ class LeptonjetProcessor(processor.ProcessorABC):
             energy=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fT'],
             jetid=df['akjet_ak4PFJetsCHS_jetid'],
             deepcsv=df['hftagscore_DeepCSV_b'],
+            hadfrac=df['akjet_ak4PFJetsCHS_hadronEnergyFraction'],
         )
         deepcsv_tight = np.bitwise_and(ak4jets.deepcsv, 1<<2)==(1<<2)
         ak4jets.add_attributes(deepcsvTight=deepcsv_tight)
@@ -109,7 +111,7 @@ class LeptonjetProcessor(processor.ProcessorABC):
         ispfmujet = (npfmu>=2)&(ndsa==0)
         isdsajet = ndsa>0
         label = isegammajet.astype(int)*1+ispfmujet.astype(int)*2+isdsajet.astype(int)*3
-        leptonjets.add_attributes(label=label)
+        leptonjets.add_attributes(label=label, ndsa=ndsa)
         nmu = ((ljdautype==3)|(ljdautype==8)).sum()
         leptonjets.add_attributes(ismutype=(nmu>=2), iseltype=(nmu==0))
 
@@ -144,6 +146,8 @@ class LeptonjetProcessor(processor.ProcessorABC):
             (~channel_2mu2e.astype(bool)) | (channel_2mu2e.astype(bool)&(((lj0.iseltype)&(lj0.pt>40)) | ((lj1.iseltype)&(lj1.pt>40))).flatten() ), # EGMpt0>40
             ( (lj0.ismutype&(lj0.pt>40)) | ((~lj0.ismutype)&(lj1.ismutype&(lj1.pt>40))) ).flatten(), # Mupt0>40
             ( (~(channel_==2)) | (channel_==2)&((lj1.pt>30).flatten()) ), # Mupt1>30
+            ((lj0.label==3)|(lj1.label==3)).flatten(),             # >=1 dsalj
+            ((lj0.ndsa==2)|(lj1.ndsa==2)).flatten(),               # >=1 dsalj(2dsa)
         ]
 
         if self.region == 'CR':
@@ -175,16 +179,6 @@ class LeptonjetProcessor(processor.ProcessorABC):
         return accumulator
 
 
-def sigsort(param):
-    # mXX-1000_mA-0p25_lxy-0p3
-    params_ = param.split('_')
-    mxx = float(params_[0].split('-')[-1])
-    ma  = float(params_[1].split('-')[-1].replace('p', '.'))
-    lxy = float(params_[2].split('-')[-1].replace('p', '.'))
-
-    return lxy*1e6 + mxx*1e3 + ma
-
-
 
 if __name__ == "__main__":
     import os
@@ -199,15 +193,17 @@ if __name__ == "__main__":
 
     ## SR
 
-    CUTNAMES = {
-        0: '>=2lj',
-        1: 'dphi>pi/2',
-        2: 'Njets<4',
-        3: 'NtightB==0',
-        4: 'EGM0pt>40',
-        5: 'Mu0pt>40',
-        6: 'Mu1pt>30',
-    }
+    CUTNAMES = dict(enumerate([
+        '>=2lj',
+        'dphi>pi/2',
+        'Njets<4',
+        'NtightB==0',
+        'EGM0pt>40',
+        'Mu0pt>40',
+        'Mu1pt>30',
+        '>=1DSALJ',
+        '>=1DSALJ(2dsa)',
+    ]))
 
     out_sig2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                   treename='ffNtuplizer/ffNtuple',
@@ -264,15 +260,17 @@ if __name__ == "__main__":
 
     ## CR
 
-    CUTNAMES = {
-        0: '>=2lj',
-        1: 'dphi<=pi/2',
-        2: 'Njets<4',
-        3: 'NtightB==0',
-        4: 'EGM0pt>40',
-        5: 'Mu0pt>40',
-        6: 'Mu1pt>30',
-    }
+    CUTNAMES = dict(enumerate([
+        '>=2lj',
+        'dphi<pi/2',
+        'Njets<4',
+        'NtightB==0',
+        'EGM0pt>40',
+        'Mu0pt>40',
+        'Mu1pt>30',
+        '>=1DSALJ',
+        '>=1DSALJ(2dsa)',
+    ]))
 
     out_sig2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                   treename='ffNtuplizer/ffNtuple',
