@@ -590,7 +590,7 @@ if __name__ == "__main__":
     ax.set_xticks(np.arange(0, 251, 25))
     ax.grid(axis='y', ls='--')
     ax.legend()
-    ax.set_title('[signalMC|2mu2e] leptonjet source - egamma candidates (PFElectron+PFPhoton)\nreconstruction efficiency vs. gen electron lxy', x=0.0, ha="left")
+    ax.set_title('[signalMC|2mu2e] leptonjet source - egamma candidates\n(PFElectron+PFPhoton) reconstruction efficiency vs. gen electron lxy', x=0.0, ha="left")
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel('Efficiency/2.5', y=1.0, ha="right")
     ax.text( 0.6, 0.6, '$\geqslant$2 gen electrons with\n$p_T>10GeV, |\eta|<2.4, vxy<250cm$\n$\Delta R$(gen,reco)<0.3', transform=ax.transAxes)
