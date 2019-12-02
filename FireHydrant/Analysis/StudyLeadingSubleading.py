@@ -111,6 +111,10 @@ class LeptonjetLeadSubleadProcessor(processor.ProcessorABC):
         leptonjets.add_attributes(label=label)
         nmu = ((ljdautype==3)|(ljdautype==8)).sum()
         leptonjets.add_attributes(ismutype=(nmu>=2), iseltype=(nmu==0))
+        ljdaucharge = awkward.fromiter(df['pfjet_pfcand_charge']).sum()
+        leptonjets.add_attributes(qsum=ljdaucharge)
+        leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
+        leptonjets = leptonjets[leptonjets.isneutral]
 
         # leptonjets = leptonjets[((~leptonjets.iseltype)|(leptonjets.iseltype&(leptonjets.pt>40)))] # EGM-type lj pt > 40
         # leptonjets = leptonjets[((~leptonjets.ismutype)|(leptonjets.ismutype&(leptonjets.pt>30)))] # Mu-type lj pt > 30
