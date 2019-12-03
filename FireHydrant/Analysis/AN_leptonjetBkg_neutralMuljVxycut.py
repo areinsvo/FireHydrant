@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """For AN
-leptonjet+event kinematics for sig/bkg, all region
+leptonjet+event kinematics for sig/bkg, all region,  w/ vxy cut, and neutrality for mulj
 """
 import argparse
 
@@ -116,9 +116,11 @@ class LJBkgProcessor(processor.ProcessorABC):
         ljdaucharge = awkward.fromiter(df['pfjet_pfcand_charge']).sum()
         leptonjets.add_attributes(qsum=ljdaucharge)
         leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
+        leptonjets.add_attributes(displaced=((leptonjets.vxy>=5)|(np.isnan(leptonjets.vxy)&leptonjets.ismutype))) # non-vertex treated as displaced too
+        leptonjets = leptonjets[leptonjets.isneutral]
 
-        ## __ twoleptonjets__
-        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)
+        ## __ twoleptonjets__ AND >=1 displaced
+        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)&(leptonjets.displaced.sum()>=1)
         dileptonjets = leptonjets[twoleptonjets]
         wgt = weight[twoleptonjets]
 
@@ -228,8 +230,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'lj0pt_2mu2e.png'))
-    fig.savefig(join(outdir, 'lj0pt_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'lj0pt_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'lj0pt_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # subleading lj pt
@@ -248,8 +250,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'lj1pt_2mu2e.png'))
-    fig.savefig(join(outdir, 'lj1pt_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'lj1pt_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'lj1pt_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj mass
@@ -268,8 +270,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'muljmass_2mu2e.png'))
-    fig.savefig(join(outdir, 'muljmass_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'muljmass_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljmass_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj vxy
@@ -288,8 +290,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'muljvxy_2mu2e.png'))
-    fig.savefig(join(outdir, 'muljvxy_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'muljvxy_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljvxy_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj qsum
@@ -311,10 +313,9 @@ if __name__ == "__main__":
         ax.set_xticklabels([r'qsum$\neq$0', 'qsum=0'])
     axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
     axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
-    axes[1].set_yticks(np.arange(0, 1.05, 0.1))
 
-    fig.savefig(join(outdir, 'muljqsum_2mu2e.png'))
-    fig.savefig(join(outdir, 'muljqsum_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'muljqsum_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljqsum_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # lj pair mass
@@ -333,8 +334,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'ljpairmass_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljpairmass_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'ljpairmass_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'ljpairmass_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
     # lj pair dphi
@@ -353,8 +354,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'ljpairdphi_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljpairdphi_2mu2e.pdf'))
+    fig.savefig(join(outdir, 'ljpairdphi_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'ljpairdphi_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
 
 
@@ -381,8 +382,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'lj0pt_4mu.png'))
-    fig.savefig(join(outdir, 'lj0pt_4mu.pdf'))
+    fig.savefig(join(outdir, 'lj0pt_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'lj0pt_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # subleading lj pt
@@ -401,8 +402,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'lj1pt_4mu.png'))
-    fig.savefig(join(outdir, 'lj1pt_4mu.pdf'))
+    fig.savefig(join(outdir, 'lj1pt_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'lj1pt_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj mass
@@ -421,8 +422,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'muljmass_4mu.png'))
-    fig.savefig(join(outdir, 'muljmass_4mu.pdf'))
+    fig.savefig(join(outdir, 'muljmass_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljmass_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj vxy
@@ -441,8 +442,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'muljvxy_4mu.png'))
-    fig.savefig(join(outdir, 'muljvxy_4mu.pdf'))
+    fig.savefig(join(outdir, 'muljvxy_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljvxy_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj qsum
@@ -464,10 +465,9 @@ if __name__ == "__main__":
         ax.set_xticklabels([r'qsum$\neq$0', 'qsum=0'])
     axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
     axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
-    axes[1].set_yticks(np.arange(0, 1.05, 0.1))
 
-    fig.savefig(join(outdir, 'muljqsum_4mu.png'))
-    fig.savefig(join(outdir, 'muljqsum_4mu.pdf'))
+    fig.savefig(join(outdir, 'muljqsum_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljqsum_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # lj pair mass
@@ -486,8 +486,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'ljpairmass_4mu.png'))
-    fig.savefig(join(outdir, 'ljpairmass_4mu.pdf'))
+    fig.savefig(join(outdir, 'ljpairmass_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'ljpairmass_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # lj pair dphi
@@ -506,8 +506,8 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
 
-    fig.savefig(join(outdir, 'ljpairdphi_4mu.png'))
-    fig.savefig(join(outdir, 'ljpairdphi_4mu.pdf'))
+    fig.savefig(join(outdir, 'ljpairdphi_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'ljpairdphi_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     if args.sync:
