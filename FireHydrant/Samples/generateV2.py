@@ -28,6 +28,12 @@ def list_files(dir, pattern=None):
     return [f for f in eosfindfile(dir, pattern=pattern) if f and "/failed" not in f]
 
 
+def last_submit_timestamp(parentPathOfTimestamps):
+    timestamps = eosls(parentPathOfTimestamps)
+    last_ts = sorted(timestamps, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))[-1]
+    return datetime.strptime(last_ts, "%y%m%d_%H%M%S")
+
+
 def latest_files(parentPathOfTimestamps, pattern=None):
     """
     list file names of latest batch job submission
@@ -61,12 +67,26 @@ def generate_background_files(skim=False, forscale=False):
     if forscale:
         _dirmap = EOSPATHS_BKGAOD
 
+    ## get max(latest) timestamp
+    ## Note: for scale, it will scan AOD skim submissions, we do not put limit on
+    ## submission timestamps as it can span over a longer time.
+    if forscale is False:
+        timestamps = []
+        for group in _dirmap:
+            for tag in _dirmap[group]:
+                for path in _dirmap[group][tag]:
+                    timestamps.append(sorted(eosls(path), key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))[-1])
+        maxts = sorted(timestamps, key=lambda x: datetime.strptime(x, "%y%m%d_%H%M%S"))[-1]
+        maxts = datetime.strptime(maxts, "%y%m%d_%H%M%S")
+
     generated = dict()
     for group in _dirmap:
         generated[group] = {}
         for tag in _dirmap[group]:
             generated[group][tag] = []
             for path in _dirmap[group][tag]:
+                if forscale is False:
+                    if (maxts - last_submit_timestamp(path)).seconds > 60*60: continue
                 generated[group][tag].extend(latest_files(path, pattern='*ffNtuple*.root'))
 
     return generated

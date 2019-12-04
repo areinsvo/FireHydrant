@@ -66,8 +66,14 @@ EOSPATHS_BKGSKIM = dict(
             "/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-120to170_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
             ],
         "QCD_Pt-170to300": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-170to300_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
-        "QCD_Pt-300to470": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",],
-        "QCD_Pt-470to600": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
+        "QCD_Pt-300to470": [
+            "/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v3",
+            "/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-300to470_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v1",
+        ],
+        "QCD_Pt-470to600": [
+            "/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",
+            "/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-470to600_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext1-v2",
+        ],
         "QCD_Pt-600to800": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-600to800_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
         "QCD_Pt-800to1000": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-800to1000_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15_ext3-v2",],
         "QCD_Pt-1000toInf": ["/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/QCD_Pt-1000toInf_MuEnrichedPt5_TuneCP5_13TeV_pythia8/RunIIAutumn18DRPremix-102X_upgrade2018_realistic_v15-v1",],
