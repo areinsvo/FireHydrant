@@ -45,6 +45,9 @@ class LJBkgProcessor(processor.ProcessorABC):
         ljmass_axis = hist.Bin('ljmass', 'mass [GeV]', 100, 0, 20)
         pairmass_axis = hist.Bin('pairmass', 'mass [GeV]', 100, 0, 200)
         vxy_axis = hist.Bin('vxy', 'vxy [cm]', 100, 0, 20)
+        error_axis = hist.Bin('error', '$\sigma_{lxy}$', 100, 0, 100)
+        sig_axis = hist.Bin('sig', 'lxy/$\sigma_{lxy}$', 50, 0, 50)
+        cos_axis = hist.Bin('cos', r'$cos(\theta)$', 100, -1, 1)
         qsum_axis = hist.Bin('qsum', '$\sum$q', 2, 0, 2)
         dphi_axis = hist.Bin('dphi', '$\Delta\phi$', 50, 0, np.pi)
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
@@ -54,6 +57,9 @@ class LJBkgProcessor(processor.ProcessorABC):
             'lj1pt': hist.Hist('Counts/2GeV', dataset_axis, pt_axis, channel_axis),
             'muljmass': hist.Hist('Counts/0.2GeV', dataset_axis, ljmass_axis, channel_axis),
             'muljvxy': hist.Hist('Counts/0.2cm', dataset_axis, vxy_axis, channel_axis),
+            'muljlxyerr': hist.Hist('Norm. Frequency/1', dataset_axis, error_axis, channel_axis),
+            'muljlxysig': hist.Hist('Norm. Frequency/1', dataset_axis, sig_axis, channel_axis),
+            'muljcostheta': hist.Hist('Norm. Frequency/0.02', dataset_axis, cos_axis, channel_axis),
             'muljqsum': hist.Hist('Counts', dataset_axis, qsum_axis, channel_axis),
             'ljpairmass': hist.Hist('Counts/2GeV', dataset_axis, pairmass_axis, channel_axis),
             'ljpairdphi': hist.Hist('Counts/$\pi$/50', dataset_axis, dphi_axis, channel_axis),
@@ -101,6 +107,9 @@ class LJBkgProcessor(processor.ProcessorABC):
             vx=df['pfjet_klmvtx.fCoordinates.fX'],
             vy=df['pfjet_klmvtx.fCoordinates.fY'],
             vz=df['pfjet_klmvtx.fCoordinates.fZ'],
+            lxy=df['pfjet_klmvtx_lxy'],
+            lxysig=df['pfjet_klmvtx_lxySig'],
+            costheta=df['pfjet_klmvtx_cosThetaXy'],
         )
         leptonjets.add_attributes(vxy=np.hypot(leptonjets.vx, leptonjets.vy))
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
@@ -147,6 +156,9 @@ class LJBkgProcessor(processor.ProcessorABC):
         muljones = mulj.pt.ones_like()
         output['muljmass'].fill(dataset=dataset, ljmass=mulj.mass.flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
         output['muljvxy'].fill(dataset=dataset, vxy=mulj.vxy.flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
+        output['muljlxysig'].fill(dataset=dataset, sig=mulj.lxysig.flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
+        output['muljlxyerr'].fill(dataset=dataset, error=(mulj.lxy/mulj.lxysig).flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
+        output['muljcostheta'].fill(dataset=dataset, cos=-mulj.costheta.flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
         output['muljqsum'].fill(dataset=dataset, qsum=mulj.isneutral.flatten(), channel=(channel_*muljones).flatten(), weight=(wgt*muljones).flatten())
 
         output['ljpairmass'].fill(dataset=dataset, pairmass=(lj0.p4+lj1.p4).mass.flatten(), channel=channel_, weight=wgt)
@@ -293,6 +305,67 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'muljvxy_2mu2e_neutralvxycut.png'))
     fig.savefig(join(outdir, 'muljvxy_2mu2e_neutralvxycut.pdf'))
     plt.close(fig)
+
+    # muon-type lj vtx error
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljlxyerr'].integrate('channel', slice(1,2))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig2mu2e['muljlxyerr'][smallmxx].integrate('channel', slice(1,2))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='over', clear=False)
+
+    ax.set_title('[$2\mu 2e$|MC] muon-type leptonjet lxy error', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljlxyerror_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljlxyerror_2mu2e_neutralvxycut.pdf'))
+    plt.close(fig)
+
+    # muon-type lj vtx significance
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljlxysig'].integrate('channel', slice(1,2))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig2mu2e['muljlxysig'][smallmxx].integrate('channel', slice(1,2))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='over', clear=False)
+
+    ax.set_title('[$2\mu 2e$|MC] muon-type leptonjet lxy significance', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljlxysig_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljlxysig_2mu2e_neutralvxycut.pdf'))
+    plt.close(fig)
+
+    # muon-type lj cos theta
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljcostheta'].integrate('channel', slice(1,2))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='all',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig2mu2e['muljcostheta'][smallmxx].integrate('channel', slice(1,2))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='all', clear=False)
+
+    ax.set_title(r'[$2\mu 2e$|MC] muon-type leptonjet cos($\theta$)', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljcostheta_2mu2e_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljcostheta_2mu2e_neutralvxycut.pdf'))
+    plt.close(fig)
+
 
     # muon-type lj qsum
     fig, axes = plt.subplots(1,2,figsize=(16,6))
@@ -444,6 +517,66 @@ if __name__ == "__main__":
 
     fig.savefig(join(outdir, 'muljvxy_4mu_neutralvxycut.png'))
     fig.savefig(join(outdir, 'muljvxy_4mu_neutralvxycut.pdf'))
+    plt.close(fig)
+
+    # muon-type lj vtx error
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljlxyerr'].integrate('channel', slice(2,3))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig4mu['muljlxyerr'][smallmxx].integrate('channel', slice(2,3))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='over', clear=False)
+
+    ax.set_title('[$4\mu$|MC] muon-type leptonjet lxy error', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljlxyerror_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljlxyerror_4mu_neutralvxycut.pdf'))
+    plt.close(fig)
+
+    # muon-type lj vtx significance
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljlxysig'].integrate('channel', slice(2,3))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='over',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig4mu['muljlxysig'][smallmxx].integrate('channel', slice(2,3))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='over', clear=False)
+
+    ax.set_title('[$4\mu$|MC] muon-type leptonjet lxy significance', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljlxysig_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljlxysig_4mu_neutralvxycut.pdf'))
+    plt.close(fig)
+
+    # muon-type lj cos theta
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    bkghist = out_bkg['muljcostheta'].integrate('channel', slice(2,3))
+    hist.plot1d(bkghist, overlay='cat', ax=ax, stack=True, overflow='all',
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    sighist = out_sig4mu['muljcostheta'][smallmxx].integrate('channel', slice(2,3))
+    hist.plot1d(sighist, overlay='dataset', ax=ax, overflow='all', clear=False)
+
+    ax.set_title(r'[$4\mu$|MC] muon-type leptonjet cos($\theta$)', x=0.0, ha="left")
+    ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'muljcostheta_4mu_neutralvxycut.png'))
+    fig.savefig(join(outdir, 'muljcostheta_4mu_neutralvxycut.pdf'))
     plt.close(fig)
 
     # muon-type lj qsum

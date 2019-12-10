@@ -36,11 +36,19 @@ class MuLJVtxProcessor(processor.ProcessorABC):
         dataset_axis = hist.Cat('dataset', 'dataset')
         reco_axis = hist.Cat('reco', 'reco type')
         vxy_axis = hist.Bin('vxy', 'vxy [cm]', [0, 5, 70, 700])
+        lxy_axis = hist.Bin('lxy', 'lxy [cm]', 100, 0, 700)
         bool_axis = hist.Bin('boolean', 'true/false', 2, 0, 2)
         reso_axis = hist.Bin('reso', '(vxy(reco)-vxy(gen)) [cm]', 100, -25, 25)
+        error_axis = hist.Bin('error', '$\sigma_{lxy}$', 100, 0, 100)
+        cos_axis = hist.Bin('cos', r'$|cos(\theta)|$', 50, -1, 1)
+        sig_axis = hist.Bin('sig', 'lxy/$\sigma_{lxy}$', 50, 0, 50)
         self._accumulator = processor.dict_accumulator({
             'vertexgood': hist.Hist('Frequency', dataset_axis, vxy_axis, reco_axis),
             'vxyreso': hist.Hist('Norm. Frequency', dataset_axis, reso_axis, vxy_axis),
+            'lxy': hist.Hist('Norm. Frequency', dataset_axis, lxy_axis, vxy_axis),
+            'lxyerr': hist.Hist('Norm. Frequency', dataset_axis, error_axis, vxy_axis),
+            'lxysig': hist.Hist('Norm. Frequency', dataset_axis, sig_axis, vxy_axis),
+            'costheta': hist.Hist('Norm. Frequency', dataset_axis, cos_axis, vxy_axis),
         })
 
 
@@ -81,6 +89,9 @@ class MuLJVtxProcessor(processor.ProcessorABC):
             vx=df['pfjet_klmvtx.fCoordinates.fX'].content,
             vy=df['pfjet_klmvtx.fCoordinates.fY'].content,
             vz=df['pfjet_klmvtx.fCoordinates.fZ'].content,
+            lxy=df['pfjet_klmvtx_lxy'].content,
+            lxysig=df['pfjet_klmvtx_lxySig'].content,
+            costheta=df['pfjet_klmvtx_cosThetaXy'].content
         )
         leptonjets.add_attributes(vxy=np.hypot(leptonjets.vx, leptonjets.vy))
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
@@ -113,8 +124,13 @@ class MuLJVtxProcessor(processor.ProcessorABC):
         output['vertexgood'].fill(dataset=dataset, vxy=dpMu_[matchmask].daurho.flatten(), reco='vertexed')
 
         genval = dpMu_[matchmask].daurho.flatten()
-        recoval = ljmu[matchidx][ljmu.counts!=0][matchmask].vxy.flatten()
+        recoObj = ljmu[matchidx][ljmu.counts!=0][matchmask]
+        recoval = recoObj.vxy.flatten()
         output['vxyreso'].fill(dataset=dataset, reso=(recoval-genval), vxy=genval)
+        output['lxy'].fill(dataset=dataset, lxy=np.abs(recoObj.lxy).flatten(), vxy=genval)
+        output['lxysig'].fill(dataset=dataset, sig=recoObj.lxysig.flatten(), vxy=genval)
+        output['lxyerr'].fill(dataset=dataset, error=(recoObj.lxy/recoObj.lxysig).flatten(), vxy=genval)
+        output['costheta'].fill(dataset=dataset, cos=-recoObj.costheta.flatten(), vxy=genval)
 
         return output
 
@@ -172,6 +188,50 @@ if __name__ == "__main__":
 
     fig.savefig(join(outdir, 'mulj-vtxreso.png'))
     fig.savefig(join(outdir, 'mulj-vtxreso.pdf'))
+    plt.close(fig)
+
+    ## vertex significance
+    fig, ax = plt.subplots(figsize=(8,6))
+    hist.plot1d(output['lxysig'][longdecay].sum('dataset'), overlay='vxy', ax=ax, density=True, overflow='over')
+    ax.set_title(r'[signalMC|lxy300cm] muon-type leptonjet vertexing significance', x=0.0, ha="left")
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'mulj-vtxsignificance.png'))
+    fig.savefig(join(outdir, 'mulj-vtxsignificance.pdf'))
+    plt.close(fig)
+
+    ## vertex error
+    fig, ax = plt.subplots(figsize=(8,6))
+    hist.plot1d(output['lxyerr'][longdecay].sum('dataset'), overlay='vxy', ax=ax, density=True, overflow='over')
+    ax.set_title(r'[signalMC|lxy300cm] muon-type leptonjet vertexing error', x=0.0, ha="left")
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'mulj-vtxerror.png'))
+    fig.savefig(join(outdir, 'mulj-vtxerror.pdf'))
+    plt.close(fig)
+
+    ## vertex lxy
+    fig, ax = plt.subplots(figsize=(8,6))
+    hist.plot1d(output['lxy'][longdecay].sum('dataset'), overlay='vxy', ax=ax, density=True, overflow='over')
+    ax.set_title(r'[signalMC|lxy300cm] muon-type leptonjet lxy', x=0.0, ha="left")
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'mulj-vtxlxy.png'))
+    fig.savefig(join(outdir, 'mulj-vtxlxy.pdf'))
+    plt.close(fig)
+
+    ## cosTheta
+    fig, ax = plt.subplots(figsize=(8,6))
+    hist.plot1d(output['costheta'][longdecay].sum('dataset'), overlay='vxy', ax=ax, density=True, overflow='all')
+    ax.set_title(r'[signalMC|lxy300cm] muon-type leptonjet |cos($\theta$)|', x=0.0, ha="left")
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+
+    fig.savefig(join(outdir, 'mulj-costheta.png'))
+    fig.savefig(join(outdir, 'mulj-costheta.pdf'))
     plt.close(fig)
 
     # ----------------------------------------------------------
