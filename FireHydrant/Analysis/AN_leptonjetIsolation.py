@@ -114,7 +114,7 @@ class LjTkIsoProcessorSig(processor.ProcessorABC):
 
 
 class LjTkIsoProcessor(processor.ProcessorABC):
-    def __init__(self, data_type='bkg'):
+    def __init__(self, data_type='bkg', bothNeutral=True):
         dataset_axis = hist.Cat('dataset', 'dataset')
         sumpt_axis = hist.Bin('sumpt', '$\sum p_T$ [GeV]', 50, 0, 50)
         iso_axis = hist.Bin('iso', 'Isolation', 50, 0, 1)
@@ -133,6 +133,7 @@ class LjTkIsoProcessor(processor.ProcessorABC):
         self.nlo_z = get_nlo_weight_function('z')
 
         self.data_type = data_type
+        self.bothNeutral = bothNeutral
 
     @property
     def accumulator(self):
@@ -185,7 +186,7 @@ class LjTkIsoProcessor(processor.ProcessorABC):
         leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=(ljdsamuSubset.sum()==0))
-        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.isneutral)&(leptonjets.pt>30)]
+        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)]
 
         ## __ twoleptonjets__
         twoleptonjets = leptonjets.counts>=2
@@ -214,10 +215,19 @@ class LjTkIsoProcessor(processor.ProcessorABC):
         #     channel_ = channel_[isControl]
         #     wgt = wgt[isControl]
 
+        mask_ = (lj0.isneutral&lj1.isneutral).flatten()
+        if self.bothNeutral is False:
+            mask_ = ~mask_
+            mask_ = ((channel_==2)&((~lj0.isneutral&(~lj1.isneutral)).flatten())) | ((channel_==1)&mask_)
+
+        channel_ = channel_[mask_]
+        wgt = wgt[mask_]
+        dileptonjets = dileptonjets[mask_]
+
         minpfiso = (lj0.pfiso>lj1.pfiso).astype(int)*lj1.pfiso + (lj0.pfiso<lj1.pfiso).astype(int)*lj0.pfiso
-        output['minpfiso'].fill(dataset=dataset, iso=minpfiso.flatten(), channel=channel_, weight=wgt)
+        output['minpfiso'].fill(dataset=dataset, iso=minpfiso[mask_].flatten(), channel=channel_, weight=wgt)
         maxpfiso = (lj0.pfiso>lj1.pfiso).astype(int)*lj0.pfiso + (lj0.pfiso<lj1.pfiso).astype(int)*lj1.pfiso
-        output['maxpfiso'].fill(dataset=dataset, iso=maxpfiso.flatten(), channel=channel_, weight=wgt)
+        output['maxpfiso'].fill(dataset=dataset, iso=maxpfiso[mask_].flatten(), channel=channel_, weight=wgt)
 
         ljones = dileptonjets.pt.ones_like()
         output['sumpt'].fill(dataset=dataset, sumpt=dileptonjets.sumtkpt.flatten(), channel=(channel_*ljones).flatten(), weight=(wgt*ljones).flatten())
@@ -291,36 +301,36 @@ if __name__ == "__main__":
     sampleSig = re.compile('mXX-150_mA-0p25_lxy-300|mXX-500_mA-1p2_lxy-300|mXX-800_mA-5_lxy-300')
 
     ## sum track pt
-    fig, (ax, rax) = make_ratio_plot(output_bkg['sumpt'].integrate('channel', slice(1,2)),
-                                     output_data['sumpt'].integrate('channel', slice(1,2)),
-                                     title='[$2\mu 2e$,data-CR] leptonjet track $\sum p_T$')
-    fig.savefig(join(outdir, 'ljiso-tkptsum_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljiso-tkptsum_2mu2e.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['sumpt'].integrate('channel', slice(1,2)),
+    #                                  output_data['sumpt'].integrate('channel', slice(1,2)),
+    #                                  title='[$2\mu 2e$,data-CR] leptonjet track $\sum p_T$')
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_2mu2e.png'))
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_2mu2e.pdf'))
+    # plt.close(fig)
 
-    fig, (ax, rax) = make_ratio_plot(output_bkg['sumpt'].integrate('channel', slice(2,3)),
-                                     output_data['sumpt'].integrate('channel', slice(2,3)),
-                                     title='[$4\mu$,data-CR] leptonjet track $\sum p_T$')
-    fig.savefig(join(outdir, 'ljiso-tkptsum_4mu.png'))
-    fig.savefig(join(outdir, 'ljiso-tkptsum_4mu.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['sumpt'].integrate('channel', slice(2,3)),
+    #                                  output_data['sumpt'].integrate('channel', slice(2,3)),
+    #                                  title='[$4\mu$,data-CR] leptonjet track $\sum p_T$')
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_4mu.png'))
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_4mu.pdf'))
+    # plt.close(fig)
 
     ## pfiso05 noPU
-    fig, (ax, rax) = make_ratio_plot(output_bkg['pfiso'].integrate('channel', slice(1,2)),
-                                     output_data['pfiso'].integrate('channel', slice(1,2)),
-                                     sigh=output_2mu2e['pfiso'][sampleSig].integrate('channel', slice(1,2)),
-                                     title='[$2\mu 2e$,data-CR] leptonjet pfiso05-noPU', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_2mu2e.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['pfiso'].integrate('channel', slice(1,2)),
+    #                                  output_data['pfiso'].integrate('channel', slice(1,2)),
+    #                                  sigh=output_2mu2e['pfiso'][sampleSig].integrate('channel', slice(1,2)),
+    #                                  title='[$2\mu 2e$,data-CR] leptonjet pfiso05-noPU', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_2mu2e.png'))
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_2mu2e.pdf'))
+    # plt.close(fig)
 
-    fig, (ax, rax) = make_ratio_plot(output_bkg['pfiso'].integrate('channel', slice(2,3)),
-                                     output_data['pfiso'].integrate('channel', slice(2,3)),
-                                     sigh=output_4mu['pfiso'][sampleSig].integrate('channel', slice(2,3)),
-                                     title='[$4\mu$,data-CR] leptonjet pfiso05-noPU', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_4mu.png'))
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_4mu.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['pfiso'].integrate('channel', slice(2,3)),
+    #                                  output_data['pfiso'].integrate('channel', slice(2,3)),
+    #                                  sigh=output_4mu['pfiso'][sampleSig].integrate('channel', slice(2,3)),
+    #                                  title='[$4\mu$,data-CR] leptonjet pfiso05-noPU', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_4mu.png'))
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_4mu.pdf'))
+    # plt.close(fig)
 
     ## min pfiso05 noPU
     fig, (ax, rax) = make_ratio_plot(output_bkg['minpfiso'].integrate('channel', slice(1,2)),
@@ -340,88 +350,140 @@ if __name__ == "__main__":
     plt.close(fig)
 
     ## max pfiso05 noPU
-    fig, (ax, rax) = make_ratio_plot(output_bkg['maxpfiso'].integrate('channel', slice(1,2)),
-                                     output_data['maxpfiso'].integrate('channel', slice(1,2)),
-                                     sigh=output_2mu2e['maxpfiso'][sampleSig].integrate('channel', slice(1,2)),
-                                     title='[$2\mu 2e$,data-CR] leptonjet max pfiso05-noPU', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_2mu2e.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['maxpfiso'].integrate('channel', slice(1,2)),
+    #                                  output_data['maxpfiso'].integrate('channel', slice(1,2)),
+    #                                  sigh=output_2mu2e['maxpfiso'][sampleSig].integrate('channel', slice(1,2)),
+    #                                  title='[$2\mu 2e$,data-CR] leptonjet max pfiso05-noPU', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_2mu2e.png'))
+    # fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_2mu2e.pdf'))
+    # plt.close(fig)
 
-    fig, (ax, rax) = make_ratio_plot(output_bkg['maxpfiso'].integrate('channel', slice(2,3)),
-                                     output_data['maxpfiso'].integrate('channel', slice(2,3)),
-                                     sigh=output_4mu['maxpfiso'][sampleSig].integrate('channel', slice(2,3)),
-                                     title='[$4\mu$,data-CR] leptonjet max pfiso05-noPU', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_4mu.png'))
-    fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_4mu.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['maxpfiso'].integrate('channel', slice(2,3)),
+    #                                  output_data['maxpfiso'].integrate('channel', slice(2,3)),
+    #                                  sigh=output_4mu['maxpfiso'][sampleSig].integrate('channel', slice(2,3)),
+    #                                  title='[$4\mu$,data-CR] leptonjet max pfiso05-noPU', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_4mu.png'))
+    # fig.savefig(join(outdir, 'ljiso-maxpfiso05nopu_4mu.pdf'))
+    # plt.close(fig)
 
 
     ## pfiso dbeta
-    fig, (ax, rax) = make_ratio_plot(output_bkg['isodbeta'].integrate('channel', slice(1,2)),
-                                     output_data['isodbeta'].integrate('channel', slice(1,2)),
-                                     sigh=output_2mu2e['isodbeta'][sampleSig].integrate('channel', slice(1,2)),
-                                     title='[$2\mu 2e$,data-CR] leptonjet pfiso-dbeta', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-pfisdbeta_2mu2e.png'))
-    fig.savefig(join(outdir, 'ljiso-pfisdbeta_2mu2e.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['isodbeta'].integrate('channel', slice(1,2)),
+    #                                  output_data['isodbeta'].integrate('channel', slice(1,2)),
+    #                                  sigh=output_2mu2e['isodbeta'][sampleSig].integrate('channel', slice(1,2)),
+    #                                  title='[$2\mu 2e$,data-CR] leptonjet pfiso-dbeta', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-pfisdbeta_2mu2e.png'))
+    # fig.savefig(join(outdir, 'ljiso-pfisdbeta_2mu2e.pdf'))
+    # plt.close(fig)
 
-    fig, (ax, rax) = make_ratio_plot(output_bkg['isodbeta'].integrate('channel', slice(2,3)),
-                                     output_data['isodbeta'].integrate('channel', slice(2,3)),
-                                     sigh=output_4mu['isodbeta'][sampleSig].integrate('channel', slice(2,3)),
-                                     title='[$4\mu$,data-CR] leptonjet pfiso-dbeta', overflow='none')
-    fig.savefig(join(outdir, 'ljiso-pfisodbeta_4mu.png'))
-    fig.savefig(join(outdir, 'ljiso-pfisodbeta_4mu.pdf'))
-    plt.close(fig)
+    # fig, (ax, rax) = make_ratio_plot(output_bkg['isodbeta'].integrate('channel', slice(2,3)),
+    #                                  output_data['isodbeta'].integrate('channel', slice(2,3)),
+    #                                  sigh=output_4mu['isodbeta'][sampleSig].integrate('channel', slice(2,3)),
+    #                                  title='[$4\mu$,data-CR] leptonjet pfiso-dbeta', overflow='none')
+    # fig.savefig(join(outdir, 'ljiso-pfisodbeta_4mu.png'))
+    # fig.savefig(join(outdir, 'ljiso-pfisodbeta_4mu.pdf'))
+    # plt.close(fig)
 
     # ----------------------------------------------------------
 
-    output_sig = processor.run_uproot_job(sigDS,
+    output_2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                     treename='ffNtuplizer/ffNtuple',
-                                    processor_instance=LjTkIsoProcessorSig(),
+                                    processor_instance=LjTkIsoProcessor(data_type='sig-2mu2e', bothNeutral=False),
                                     executor=processor.futures_executor,
                                     executor_args=dict(workers=12, flatten=False),
                                     chunksize=500000,
                                     )
-    channel_2mu2e = re.compile('2mu2e.*$')
-    channel_4mu = re.compile('4mu.*$')
 
-    fig, ax = plt.subplots(figsize=(8,6))
-    hist.plot1d(output_sig['sumpt'][channel_2mu2e].sum('dataset'), ax=ax, overflow='over', density=True)
-    hs_2mu2e = tuple(ax.get_legend_handles_labels()[0])
-    hist.plot1d(output_sig['sumpt'][channel_4mu].sum('dataset'), ax=ax, overflow='over', density=True, clear=False)
-    hs_ = ax.get_legend_handles_labels()[0]
-    hs_4mu = tuple([h for h in hs_ if h not in hs_2mu2e])
+    output_4mu = processor.run_uproot_job(sigDS_4mu,
+                                    treename='ffNtuplizer/ffNtuple',
+                                    processor_instance=LjTkIsoProcessor(data_type='sig-4mu', bothNeutral=False),
+                                    executor=processor.futures_executor,
+                                    executor_args=dict(workers=12, flatten=False),
+                                    chunksize=500000,
+                                    )
 
-    ax.set_title('[signalMC|lxy300cm] leptonjet track $\sum p_T$', x=0, ha='left')
-    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
-    ax.set_ylabel(ax.get_ylabel()+'/1GeV', y=1.0, ha="right")
-    ax.set_yscale('log')
-    ax.autoscale(axis='both', tight=True)
-    ax.legend([hs_4mu, hs_2mu2e], ['$4\mu$', '$2\mu 2e$'])
+    output_bkg = processor.run_uproot_job(bkgDS,
+                                    treename='ffNtuplizer/ffNtuple',
+                                    processor_instance=LjTkIsoProcessor(data_type='bkg', bothNeutral=False),
+                                    executor=processor.futures_executor,
+                                    executor_args=dict(workers=12, flatten=False),
+                                    chunksize=500000,
+                                    )
 
-    fig.savefig(join(outdir, 'ljiso-tkptsum_sig.png'))
-    fig.savefig(join(outdir, 'ljiso-tkptsum_sig.pdf'))
+    output_data = processor.run_uproot_job(dataDS,
+                                    treename='ffNtuplizer/ffNtuple',
+                                    processor_instance=LjTkIsoProcessor(data_type='data', bothNeutral=False),
+                                    executor=processor.futures_executor,
+                                    executor_args=dict(workers=12, flatten=False),
+                                    chunksize=500000,
+                                    )
+
+    ## min pfiso05 noPU
+    fig, (ax, rax) = make_ratio_plot(output_bkg['minpfiso'].integrate('channel', slice(1,2)),
+                                     output_data['minpfiso'].integrate('channel', slice(1,2)),
+                                     sigh=output_2mu2e['minpfiso'][sampleSig].integrate('channel', slice(1,2)),
+                                     title='[$2\mu 2e$] leptonjet(~neutral) min pfiso05-noPU', overflow='none')
+    fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_2mu2e.png'))
+    fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_2mu2e.pdf'))
     plt.close(fig)
 
-
-    fig, ax = plt.subplots(figsize=(8,6))
-    hist.plot1d(output_sig['pfiso'][channel_2mu2e].sum('dataset'), ax=ax, overflow='over', density=True)
-    hs_2mu2e = tuple(ax.get_legend_handles_labels()[0])
-    hist.plot1d(output_sig['pfiso'][channel_4mu].sum('dataset'), ax=ax, overflow='over', density=True, clear=False)
-    hs_ = ax.get_legend_handles_labels()[0]
-    hs_4mu = tuple([h for h in hs_ if h not in hs_2mu2e])
-
-    ax.set_title('[signalMC|lxy300cm] leptonjet pfiso05-nopu', x=0, ha='left')
-    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
-    ax.set_ylabel(ax.get_ylabel()+'/1GeV', y=1.0, ha="right")
-    ax.set_yscale('log')
-    ax.autoscale(axis='both', tight=True)
-    ax.legend([hs_4mu, hs_2mu2e], ['$4\mu$', '$2\mu 2e$'])
-
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_sig.png'))
-    fig.savefig(join(outdir, 'ljiso-pfiso05nopu_sig.pdf'))
+    fig, (ax, rax) = make_ratio_plot(output_bkg['minpfiso'].integrate('channel', slice(2,3)),
+                                     output_data['minpfiso'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['minpfiso'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$] leptonjet(~neutral) min pfiso05-noPU', overflow='none')
+    fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_4mu.png'))
+    fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_4mu.pdf'))
     plt.close(fig)
+
+    # ----------------------------------------------------------
+
+
+    # output_sig = processor.run_uproot_job(sigDS,
+    #                                 treename='ffNtuplizer/ffNtuple',
+    #                                 processor_instance=LjTkIsoProcessorSig(),
+    #                                 executor=processor.futures_executor,
+    #                                 executor_args=dict(workers=12, flatten=False),
+    #                                 chunksize=500000,
+    #                                 )
+    # channel_2mu2e = re.compile('2mu2e.*$')
+    # channel_4mu = re.compile('4mu.*$')
+
+    # fig, ax = plt.subplots(figsize=(8,6))
+    # hist.plot1d(output_sig['sumpt'][channel_2mu2e].sum('dataset'), ax=ax, overflow='over', density=True)
+    # hs_2mu2e = tuple(ax.get_legend_handles_labels()[0])
+    # hist.plot1d(output_sig['sumpt'][channel_4mu].sum('dataset'), ax=ax, overflow='over', density=True, clear=False)
+    # hs_ = ax.get_legend_handles_labels()[0]
+    # hs_4mu = tuple([h for h in hs_ if h not in hs_2mu2e])
+
+    # ax.set_title('[signalMC|lxy300cm] leptonjet track $\sum p_T$', x=0, ha='left')
+    # ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    # ax.set_ylabel(ax.get_ylabel()+'/1GeV', y=1.0, ha="right")
+    # ax.set_yscale('log')
+    # ax.autoscale(axis='both', tight=True)
+    # ax.legend([hs_4mu, hs_2mu2e], ['$4\mu$', '$2\mu 2e$'])
+
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_sig.png'))
+    # fig.savefig(join(outdir, 'ljiso-tkptsum_sig.pdf'))
+    # plt.close(fig)
+
+
+    # fig, ax = plt.subplots(figsize=(8,6))
+    # hist.plot1d(output_sig['pfiso'][channel_2mu2e].sum('dataset'), ax=ax, overflow='over', density=True)
+    # hs_2mu2e = tuple(ax.get_legend_handles_labels()[0])
+    # hist.plot1d(output_sig['pfiso'][channel_4mu].sum('dataset'), ax=ax, overflow='over', density=True, clear=False)
+    # hs_ = ax.get_legend_handles_labels()[0]
+    # hs_4mu = tuple([h for h in hs_ if h not in hs_2mu2e])
+
+    # ax.set_title('[signalMC|lxy300cm] leptonjet pfiso05-nopu', x=0, ha='left')
+    # ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    # ax.set_ylabel(ax.get_ylabel()+'/1GeV', y=1.0, ha="right")
+    # ax.set_yscale('log')
+    # ax.autoscale(axis='both', tight=True)
+    # ax.legend([hs_4mu, hs_2mu2e], ['$4\mu$', '$2\mu 2e$'])
+
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_sig.png'))
+    # fig.savefig(join(outdir, 'ljiso-pfiso05nopu_sig.pdf'))
+    # plt.close(fig)
 
     # ----------------------------------------------------------
 
