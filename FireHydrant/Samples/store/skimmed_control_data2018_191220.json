@@ -1,0 +1,52 @@
+{
+    "A": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_0.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_1.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_2.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_3.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_4.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_5.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_6.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_7.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_8.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018A-17Sep2018-v2/191219_224021/ffNtuple_9.root"
+    ],
+    "B": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1/191219_224022/ffNtuple_0.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1/191219_224022/ffNtuple_1.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1/191219_224022/ffNtuple_2.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1/191219_224022/ffNtuple_3.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018B-17Sep2018-v1/191219_224022/ffNtuple_4.root"
+    ],
+    "C": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1/191219_224022/ffNtuple_0.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1/191219_224022/ffNtuple_1.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1/191219_224022/ffNtuple_2.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1/191219_224022/ffNtuple_3.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018C-17Sep2018-v1/191219_224022/ffNtuple_4.root"
+    ],
+    "D": [
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_0.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_1.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_10.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_11.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_12.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_13.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_14.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_15.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_16.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_17.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_18.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_19.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_2.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_20.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_21.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_3.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_4.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_5.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_6.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_7.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_8.root",
+        "root://cmseos.fnal.gov//eos/uscms/store/group/lpcmetx/SIDM/ffNtupleV2/Skim/2018/DoubleMuon/Run2018D-PromptReco-v2/191219_224023/ffNtuple_9.root"
+    ]
+}

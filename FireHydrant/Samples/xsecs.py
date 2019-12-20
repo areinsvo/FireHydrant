@@ -41,7 +41,7 @@ BKG_XSEC = dict(
         "WGG": 2.001,
     },
     QCD={
-        "QCD_Pt-15to20": 279900,
+        "QCD_Pt-15to20": 2799000,
         "QCD_Pt-20to30": 2526000,
         "QCD_Pt-30to50": 1362000,
         "QCD_Pt-50to80": 376600,
