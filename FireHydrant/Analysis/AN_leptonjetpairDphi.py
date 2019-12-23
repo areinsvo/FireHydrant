@@ -209,6 +209,9 @@ class LJPairDphiProcessorTotal(processor.ProcessorABC):
         self._accumulator = processor.dict_accumulator({
             'dphi-neu': hist.Hist('Counts', dataset_axis, dphi_axis, channel_axis),
             'dphi-cha': hist.Hist('Counts', dataset_axis, dphi_axis, channel_axis),
+            'dphi-0mucha': hist.Hist('Counts', dataset_axis, dphi_axis, channel_axis),
+            'dphi-1mucha': hist.Hist('Counts', dataset_axis, dphi_axis, channel_axis),
+            'dphi-01mucha': hist.Hist('Counts', dataset_axis, dphi_axis, channel_axis),
         })
 
         self.pucorrs = get_pu_weights_function()
@@ -250,6 +253,7 @@ class LJPairDphiProcessorTotal(processor.ProcessorABC):
             py=df['pfjet_p4.fCoordinates.fY'].content,
             pz=df['pfjet_p4.fCoordinates.fZ'].content,
             energy=df['pfjet_p4.fCoordinates.fT'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
         npfmu = (ljdautype==3).sum()
@@ -264,9 +268,10 @@ class LJPairDphiProcessorTotal(processor.ProcessorABC):
         ljdaucharge = awkward.fromiter(df['pfjet_pfcand_charge']).sum()
         leptonjets.add_attributes(qsum=ljdaucharge)
         leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
+        leptonjets.add_attributes(mucharged=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum!=0))))
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=(ljdsamuSubset.sum()==0))
-        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)]
+        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)&(leptonjets.mintkdist<50)]
 
         ## __ twoleptonjets__
         twoleptonjets = leptonjets.counts>=2
@@ -290,8 +295,15 @@ class LJPairDphiProcessorTotal(processor.ProcessorABC):
         ###########
 
         ljBothNeutral = ((lj0.isneutral)&(lj1.isneutral)).flatten()
+        ljBothCharged = ((~lj0.isneutral).sum()+(~lj1.isneutral).sum())==((lj0.ismutype).sum()+(lj1.ismutype).sum())
+        lj4mu0cha = (channel_==2)&((lj0.mucharged&lj1.isneutral).flatten())
+        lj4mu1cha = (channel_==2)&((lj0.isneutral&(lj1.mucharged)).flatten())
+        lj4mu0or1cha = (channel_==2)&((lj0.isneutral&(lj1.mucharged)).flatten()|(lj0.mucharged&lj1.isneutral).flatten())
         output['dphi-neu'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[ljBothNeutral].flatten()), channel=channel_[ljBothNeutral], weight=wgt[ljBothNeutral])
-        output['dphi-cha'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[~ljBothNeutral].flatten()), channel=channel_[~ljBothNeutral], weight=wgt[~ljBothNeutral])
+        output['dphi-cha'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[ljBothCharged].flatten()), channel=channel_[ljBothCharged], weight=wgt[ljBothCharged])
+        output['dphi-0mucha'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[lj4mu0cha].flatten()), channel=channel_[lj4mu0cha], weight=wgt[lj4mu0cha])
+        output['dphi-1mucha'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[lj4mu1cha].flatten()), channel=channel_[lj4mu1cha], weight=wgt[lj4mu1cha])
+        output['dphi-01mucha'].fill(dataset=dataset, dphi=np.abs(lj0.p4.delta_phi(lj1.p4)[lj4mu0or1cha].flatten()), channel=channel_[lj4mu0or1cha], weight=wgt[lj4mu0or1cha])
 
         return output
 
@@ -440,6 +452,13 @@ if __name__ == "__main__":
                                      title='[$2\mu 2e$, ~(lj0,1 sumq=0)] leptonJets pair $\Delta\phi$', overflow='none')
     ax.vlines([np.pi/2,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
 
+    print("## ljpairDphi-total-chalj_2mu2e")
+    sigh = output_2mu2e['dphi-cha'].integrate('dataset', 'mXX-500_mA-1p2_lxy-300').integrate('channel', slice(1,2))
+    bkgh = output_bkg['dphi-cha'].sum('cat').integrate('channel', slice(1,2))
+    print('sig:', sigh.values()[()])
+    print('bkg:', bkgh.values()[()])
+    print('sig/bkg:', sigh.values()[()]/bkgh.values()[()])
+
     fig.savefig(join(outdir, 'ljpairDphi-total-chalj_2mu2e.png'))
     fig.savefig(join(outdir, 'ljpairDphi-total-chalj_2mu2e.pdf'))
     plt.close(fig)
@@ -464,6 +483,42 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'ljpairDphi-total-chalj_4mu.pdf'))
     plt.close(fig)
 
+    fig, (ax, rax) = make_ratio_plot(output_bkg['dphi-0mucha'].integrate('channel', slice(2,3)),
+                                     output_data['dphi-0mucha'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['dphi-0mucha'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$, lj0 cha,lj1 neu)] leptonJets pair $\Delta\phi$', overflow='none')
+    ax.vlines([np.pi/2,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'ljpairDphi-total-0muchalj_4mu.png'))
+    fig.savefig(join(outdir, 'ljpairDphi-total-0muchalj_4mu.pdf'))
+    plt.close(fig)
+
+    fig, (ax, rax) = make_ratio_plot(output_bkg['dphi-1mucha'].integrate('channel', slice(2,3)),
+                                     output_data['dphi-1mucha'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['dphi-1mucha'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$, lj0 neu, lj1 cha)] leptonJets pair $\Delta\phi$', overflow='none')
+    ax.vlines([np.pi/2,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'ljpairDphi-total-1muchalj_4mu.png'))
+    fig.savefig(join(outdir, 'ljpairDphi-total-1muchalj_4mu.pdf'))
+    plt.close(fig)
+
+    fig, (ax, rax) = make_ratio_plot(output_bkg['dphi-01mucha'].integrate('channel', slice(2,3)),
+                                     output_data['dphi-01mucha'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['dphi-01mucha'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$, lj0|lj1 cha)] leptonJets pair $\Delta\phi$', overflow='none')
+    ax.vlines([np.pi/2,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    print("## ljpairDphi-total-01muchalj_4mu")
+    sigh = output_4mu['dphi-01mucha'].integrate('dataset', 'mXX-500_mA-1p2_lxy-300').integrate('channel', slice(2,3))
+    bkgh = output_bkg['dphi-01mucha'].sum('cat').integrate('channel', slice(2,3))
+    print('sig:', sigh.values()[()])
+    print('bkg:', bkgh.values()[()])
+    print('sig/bkg:', sigh.values()[()]/bkgh.values()[()])
+
+    fig.savefig(join(outdir, 'ljpairDphi-total-01muchalj_4mu.png'))
+    fig.savefig(join(outdir, 'ljpairDphi-total-01muchalj_4mu.pdf'))
+    plt.close(fig)
 
     # ----------------------------------------------------------
 

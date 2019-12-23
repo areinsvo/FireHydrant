@@ -41,12 +41,14 @@ class LJCosmicProcessor(processor.ProcessorABC):
         count_axis = hist.Bin('num', 'count', 20, 0, 20)
         frac_axis = hist.Bin('frac', 'fraction', 2, 0, 2)
         time_axis = hist.Bin('t', 'time [ns]', 100, -50, 50)
+        dist_axis = hist.Bin('dist', 'two tracks distance [cm]', 100, 0, 100)
         self._accumulator = processor.dict_accumulator({
             'npairs': hist.Hist('Norm. Frequency', dataset_axis, count_axis),
             'ljdsaOppo': hist.Hist('Fraction', dataset_axis, frac_axis),
             'dtcscTime': hist.Hist("Norm. Frequency", dataset_axis, time_axis),
             'rpcTime': hist.Hist("Norm. Frequency", dataset_axis, time_axis),
             'ljdsaSubset': hist.Hist('Fraction', dataset_axis, frac_axis),
+            'tkDist': hist.Hist('Norm. Frequency', dataset_axis, dist_axis),
         })
 
     @property
@@ -64,6 +66,7 @@ class LJCosmicProcessor(processor.ProcessorABC):
             py=df['pfjet_p4.fCoordinates.fY'].content,
             pz=df['pfjet_p4.fCoordinates.fZ'].content,
             energy=df['pfjet_p4.fCoordinates.fT'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
         npfmu = (ljdautype==3).sum()
@@ -84,15 +87,15 @@ class LJCosmicProcessor(processor.ProcessorABC):
         rpcTime = fromNestNestIndexArray(df['dsamuon_timeDiffRPC'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))[ljdsamuFoundOppo]
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
 
-        leptonjets = leptonjets[leptonjets.isneutral]
+        leptonjets_ = leptonjets[leptonjets.isneutral]
         ljdsamuFoundOppo = ljdsamuFoundOppo[leptonjets.isneutral]
         dtcscTime = dtcscTime[leptonjets.isneutral]
         rpcTime = rpcTime[leptonjets.isneutral]
         ljdsamuSubset = ljdsamuSubset[leptonjets.isneutral]
 
         ## __ twoleptonjets__
-        twoleptonjets = leptonjets.counts>=2
-        dileptonjets = leptonjets[twoleptonjets]
+        twoleptonjets = leptonjets_.counts>=2
+        dileptonjets = leptonjets_[twoleptonjets]
         parallelpairs = parallelpairs[twoleptonjets]
         ljdsamuFoundOppo = ljdsamuFoundOppo[twoleptonjets]
         dtcscTime = dtcscTime[twoleptonjets]
@@ -120,6 +123,7 @@ class LJCosmicProcessor(processor.ProcessorABC):
         output['dtcscTime'].fill(dataset=dataset, t=dtcscTime[channel_>0].flatten().flatten())
         output['rpcTime'].fill(dataset=dataset, t=rpcTime[channel_>0].flatten().flatten())
         output['ljdsaSubset'].fill(dataset=dataset, frac=ljdsamuSubset[channel_>0].flatten().flatten())
+        output['tkDist'].fill(dataset=dataset, dist=dileptonjets.mintkdist[channel_>0].flatten())
 
         return output
 
@@ -169,7 +173,7 @@ if __name__ == "__main__":
     ax.set_yscale('log')
     ax.autoscale(axis='both', tight=True)
     ax.set_xticks(np.arange(0, 21, 2))
-    ax.vlines([10,], 0, 1, linestyles='dashed', transform=ax.get_xaxis_transform())
+    ax.vlines([10,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
     ax.legend([hs_4mu, hs_2mu2e], [f'4mu (N>10: {frac_4mu*100:.2f}%)', f'2mu2e (N>10: {frac_2mu2e*100:.2f}%)'])
 
     fig.savefig(join(outdir, 'numParallelPairs.png'))
@@ -221,7 +225,7 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel()+'/1', y=1.0, ha="right")
     ax.autoscale(axis='both', tight=True)
-    ax.vlines([-20,], 0, 1, linestyles='dashed', transform=ax.get_xaxis_transform())
+    ax.vlines([-20,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
     ax.legend([hs_4mu, hs_2mu2e], [f'4mu (t<-20: {frac_4mu*100:.2f}%)', f'2mu2e (t<-20: {frac_2mu2e*100:.2f}%)'])
 
     fig.savefig(join(outdir, 'dtcscTimingDSAOppo.png'))
@@ -245,7 +249,7 @@ if __name__ == "__main__":
     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
     ax.set_ylabel(ax.get_ylabel()+'/1', y=1.0, ha="right")
     ax.autoscale(axis='both', tight=True)
-    ax.vlines([-7.5,], 0, 1, linestyles='dashed', transform=ax.get_xaxis_transform())
+    ax.vlines([-7.5,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
     ax.legend([hs_4mu, hs_2mu2e], [f'4mu (t<-7.5: {frac_4mu*100:.2f}%)', f'2mu2e (t<-7.5: {frac_2mu2e*100:.2f}%)'])
 
     fig.savefig(join(outdir, 'rpcTimingDSAOppo.png'))
@@ -280,6 +284,30 @@ if __name__ == "__main__":
     fig.savefig(join(outdir, 'fracSubsetCosmic1LegDSA.pdf'))
     plt.close(fig)
 
+    # ----------------------------------------------------------
+    ## two track min distance
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    hist.plot1d(output['tkDist'][channel_2mu2e].sum('dataset'), ax=ax, overflow='over', density=True)
+    hs_2mu2e = tuple(ax.get_legend_handles_labels()[0])
+    hist.plot1d(output['tkDist'][channel_4mu].sum('dataset'), ax=ax, overflow='over', density=True, clear=False)
+    hs_ = ax.get_legend_handles_labels()[0]
+    hs_4mu = tuple([h for h in hs_ if h not in hs_2mu2e])
+
+    frac_2mu2e = output['tkDist'][channel_2mu2e].sum('dataset').integrate('dist', slice(50, 100)).values()[()]/output['tkDist'][channel_2mu2e].sum('dataset', 'dist').values()[()]
+    frac_4mu   = output['tkDist'][channel_4mu].sum('dataset').integrate('dist', slice(50, 100)).values()[()]/output['tkDist'][channel_4mu].sum('dataset', 'dist').values()[()]
+
+    ax.set_title('[signalMC|lxy300cm] minimun track distances within leptonJet', x=0, ha='left')
+    ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+    ax.set_yscale('log')
+    ax.autoscale(axis='both', tight=True)
+    ax.vlines([50,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+    ax.legend([hs_4mu, hs_2mu2e], [f'4mu ({frac_4mu*100:.2f}% >50cm)', f'2mu2e ({frac_2mu2e*100:.2f}% >50cm)'])
+
+    fig.savefig(join(outdir, 'minDistAnyTwoTks.png'))
+    fig.savefig(join(outdir, 'minDistAnyTwoTks.pdf'))
+    plt.close(fig)
 
     if args.sync:
         webserver = 'wsi@lxplus.cern.ch'

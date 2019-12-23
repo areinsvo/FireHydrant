@@ -22,6 +22,32 @@ data_err_opts = {
     'emarker': '_'
 }
 
+def SetROOTHistStyle():
+    import ROOT
+    ROOT.gROOT.SetBatch()
+
+    # https://root.cern.ch/doc/master/classTStyle.html
+    # title
+    ROOT.gStyle.SetTitleAlign(13)
+    ROOT.gStyle.SetTitleX(0.1)
+    ROOT.gStyle.SetTitleY(0.96)
+    ROOT.gStyle.SetTitleFont(62, 't')
+    ROOT.gStyle.SetTitleFont(42, 'xyz')
+    ROOT.gStyle.SetTitleFontSize(0.04)
+    ROOT.gStyle.SetTitleSize(0.03, 'xyz')
+    # stat
+    ROOT.gStyle.SetStatFont(42)
+    ROOT.gStyle.SetStatFontSize(0.02)
+    ROOT.gStyle.SetStatW(0.15)
+    ROOT.gStyle.SetStatX(0.9)
+    ROOT.gStyle.SetStatY(0.9)
+    # ticks
+    ROOT.gStyle.SetPadTickX(1)
+    ROOT.gStyle.SetPadTickY(1)
+    ROOT.gStyle.SetTickLength(0.02, 'xyz')
+    # labels
+    ROOT.gStyle.SetLabelSize(0.03, 'xyz')
+
 
 def groupHandleLabel(ax):
     """
@@ -43,8 +69,9 @@ def groupHandleLabel(ax):
     return h2, l2
 
 
-def make_ratio_plot(bkgh, datah, sigh=None, title=None, overflow='over'):
+def make_ratio_plot(bkgh, datah, sigh=None, title=None, overflow='over', yscale='log'):
     import matplotlib.pyplot as plt
+    import numpy as np
     from coffea import hist
 
     fig, (ax, rax) = plt.subplots(2,1,figsize=(8,8), gridspec_kw={'height_ratios': (4,1)}, sharex=True)
@@ -58,6 +85,10 @@ def make_ratio_plot(bkgh, datah, sigh=None, title=None, overflow='over'):
         hist.plot1d(sigh, overlay='dataset', ax=ax, overflow=overflow, clear=False)
     ax.set_yscale('log')
     ax.autoscale(axis='both', tight=True)
+    ymin, ymax = ax.get_ylim()
+    if yscale == 'linear': ymax = (ymax-ymin)*1.2 + ymin
+    if yscale == 'log': ymax = 10**(((np.log10(ymax)-np.log10(ymin))*1.2) + np.log10(ymin))
+    ax.set_ylim(ymin, ymax)
     ax.set_xlabel(None)
     if sigh:
         ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
@@ -76,3 +107,53 @@ def make_ratio_plot(bkgh, datah, sigh=None, title=None, overflow='over'):
     ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
 
     return fig, (ax, rax)
+
+
+def make_mc_plot(bkgh, sigh=None, title=None, overflow='over', yscale='log'):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from coffea import hist
+
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    hist.plot1d(bkgh, overlay='cat', ax=ax,
+                clear=False, stack=True, overflow=overflow,
+                line_opts=None, fill_opts=fill_opts, error_opts=error_opts)
+    if sigh:
+        hist.plot1d(sigh, overlay='dataset', ax=ax, overflow=overflow, clear=False)
+    ax.set_yscale(yscale)
+    ax.autoscale(axis='both', tight=True)
+    ymin, ymax = ax.get_ylim()
+    if yscale == 'linear': ymax = (ymax-ymin)*1.2 + ymin
+    if yscale == 'log': ymax = 10**(((np.log10(ymax)-np.log10(ymin))*1.2) + np.log10(ymin))
+    ax.set_ylim(ymin, ymax)
+    ax.set_xlabel(ax.get_xlabel(), x=1, ha='right')
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+    ax.set_title(title, x=0.0, ha="left")
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+    if sigh:
+        ax.legend(*groupHandleLabel(ax), prop={'size': 8,}, ncol=3)
+    else:
+        leg=ax.legend()
+
+    return fig, ax
+
+
+def make_signal_plot(sigh, title=None, overflow='over', yscale='log'):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from coffea import hist
+
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    hist.plot1d(sigh, overlay='dataset', ax=ax, overflow=overflow,)
+    ax.set_yscale(yscale)
+    ax.autoscale(axis='both', tight=True)
+    ymin, ymax = ax.get_ylim()
+    if yscale == 'linear': ymax = (ymax-ymin)*1.2 + ymin
+    if yscale == 'log': ymax = 10**(((np.log10(ymax)-np.log10(ymin))*1.2) + np.log10(ymin))
+    ax.set_ylim(ymin, ymax)
+    ax.set_xlabel(ax.get_xlabel(), x=1, ha='right')
+    ax.set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+    ax.set_title(title, x=0.0, ha="left")
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+
+    return fig, ax

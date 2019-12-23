@@ -117,7 +117,7 @@ class LjTkIsoProcessor(processor.ProcessorABC):
     def __init__(self, data_type='bkg', bothNeutral=True):
         dataset_axis = hist.Cat('dataset', 'dataset')
         sumpt_axis = hist.Bin('sumpt', '$\sum p_T$ [GeV]', 50, 0, 50)
-        iso_axis = hist.Bin('iso', 'Isolation', 50, 0, 1)
+        iso_axis = hist.Bin('iso', 'Isolation', np.arange(0, 1, 0.04))
         channel_axis = hist.Bin('channel', 'channel', 3, 0, 3)
         self._accumulator = processor.dict_accumulator({
             'sumpt': hist.Hist('Counts', dataset_axis, sumpt_axis, channel_axis),
@@ -125,6 +125,7 @@ class LjTkIsoProcessor(processor.ProcessorABC):
             'isodbeta': hist.Hist('Counts', dataset_axis, iso_axis, channel_axis),
             'minpfiso': hist.Hist('Counts', dataset_axis, iso_axis, channel_axis),
             'maxpfiso': hist.Hist('Counts', dataset_axis, iso_axis, channel_axis),
+            'lj0pfiso': hist.Hist('Counts', dataset_axis, iso_axis, channel_axis),
         })
 
         self.pucorrs = get_pu_weights_function()
@@ -170,6 +171,7 @@ class LjTkIsoProcessor(processor.ProcessorABC):
             sumtkpt=df['pfjet_tkPtSum05'].content,
             pfiso=df['pfjet_pfIsolationNoPU05'].content,
             isodbeta=df['pfjet_pfiso'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
         npfmu = (ljdautype==3).sum()
@@ -184,9 +186,10 @@ class LjTkIsoProcessor(processor.ProcessorABC):
         ljdaucharge = awkward.fromiter(df['pfjet_pfcand_charge']).sum()
         leptonjets.add_attributes(qsum=ljdaucharge)
         leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
+        leptonjets.add_attributes(mucharged=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum!=0))))
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=(ljdsamuSubset.sum()==0))
-        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)]
+        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)&(leptonjets.mintkdist<50)]
 
         ## __ twoleptonjets__
         twoleptonjets = leptonjets.counts>=2
@@ -217,8 +220,8 @@ class LjTkIsoProcessor(processor.ProcessorABC):
 
         mask_ = (lj0.isneutral&lj1.isneutral).flatten()
         if self.bothNeutral is False:
-            mask_ = ~mask_
-            mask_ = ((channel_==2)&((~lj0.isneutral&(~lj1.isneutral)).flatten())) | ((channel_==1)&mask_)
+            mask_ = (lj0.mucharged&lj1.mucharged).flatten()
+            # mask_ = ((channel_==2)&((~lj0.isneutral&(~lj1.isneutral)).flatten())) | ((channel_==1)&mask_)
 
         channel_ = channel_[mask_]
         wgt = wgt[mask_]
@@ -228,6 +231,8 @@ class LjTkIsoProcessor(processor.ProcessorABC):
         output['minpfiso'].fill(dataset=dataset, iso=minpfiso[mask_].flatten(), channel=channel_, weight=wgt)
         maxpfiso = (lj0.pfiso>lj1.pfiso).astype(int)*lj0.pfiso + (lj0.pfiso<lj1.pfiso).astype(int)*lj1.pfiso
         output['maxpfiso'].fill(dataset=dataset, iso=maxpfiso[mask_].flatten(), channel=channel_, weight=wgt)
+
+        output['lj0pfiso'].fill(dataset=dataset, iso=lj0.pfiso[mask_].flatten(), channel=channel_, weight=wgt)
 
         ljones = dileptonjets.pt.ones_like()
         output['sumpt'].fill(dataset=dataset, sumpt=dileptonjets.sumtkpt.flatten(), channel=(channel_*ljones).flatten(), weight=(wgt*ljones).flatten())
@@ -337,6 +342,16 @@ if __name__ == "__main__":
                                      output_data['minpfiso'].integrate('channel', slice(1,2)),
                                      sigh=output_2mu2e['minpfiso'][sampleSig].integrate('channel', slice(1,2)),
                                      title='[$2\mu 2e$,data-CR] leptonjet min pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    print("## ljiso-minpfiso05nopu_2mu2e")
+    sigh = output_2mu2e['minpfiso'].integrate('dataset', 'mXX-500_mA-1p2_lxy-300').integrate('channel', slice(1,2))
+    bkgh = output_bkg['minpfiso'].sum('cat').integrate('channel', slice(1,2))
+    print('sig:', sigh.values()[()])
+    print('bkg:', bkgh.values()[()])
+    print('sig/bkg > 0.12:', sigh.values()[()][3:].sum()/bkgh.values()[()][3:].sum())
+    print('sig/bkg > 0.16:', sigh.values()[()][4:].sum()/bkgh.values()[()][4:].sum())
+
     fig.savefig(join(outdir, 'ljiso-minpfiso05nopu_2mu2e.png'))
     fig.savefig(join(outdir, 'ljiso-minpfiso05nopu_2mu2e.pdf'))
     plt.close(fig)
@@ -345,8 +360,39 @@ if __name__ == "__main__":
                                      output_data['minpfiso'].integrate('channel', slice(2,3)),
                                      sigh=output_4mu['minpfiso'][sampleSig].integrate('channel', slice(2,3)),
                                      title='[$4\mu$,data-CR] leptonjet min pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    print("## ljiso-minpfiso05nopu_4mu")
+    sigh = output_4mu['minpfiso'].integrate('dataset', 'mXX-500_mA-1p2_lxy-300').integrate('channel', slice(2,3))
+    bkgh = output_bkg['minpfiso'].sum('cat').integrate('channel', slice(2,3))
+    print('sig:', sigh.values()[()])
+    print('bkg:', bkgh.values()[()])
+    print('sig/bkg > 0.12:', sigh.values()[()][3:].sum()/bkgh.values()[()][3:].sum())
+    print('sig/bkg > 0.16:', sigh.values()[()][4:].sum()/bkgh.values()[()][4:].sum())
+
     fig.savefig(join(outdir, 'ljiso-minpfiso05nopu_4mu.png'))
     fig.savefig(join(outdir, 'ljiso-minpfiso05nopu_4mu.pdf'))
+    plt.close(fig)
+
+    ## leading leptonjet pfiso05 noPU
+    fig, (ax, rax) = make_ratio_plot(output_bkg['lj0pfiso'].integrate('channel', slice(1,2)),
+                                     output_data['lj0pfiso'].integrate('channel', slice(1,2)),
+                                     sigh=output_2mu2e['lj0pfiso'][sampleSig].integrate('channel', slice(1,2)),
+                                     title='[$2\mu 2e$] leptonjet(neutral) leading lj pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'ljiso-lj0pfiso05nopu_2mu2e.png'))
+    fig.savefig(join(outdir, 'ljiso-lj0pfiso05nopu_2mu2e.pdf'))
+    plt.close(fig)
+
+    fig, (ax, rax) = make_ratio_plot(output_bkg['lj0pfiso'].integrate('channel', slice(2,3)),
+                                     output_data['lj0pfiso'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['lj0pfiso'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$] leptonjet(both neutral) leading lj pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'ljiso-lj0pfiso05nopu_4mu.png'))
+    fig.savefig(join(outdir, 'ljiso-lj0pfiso05nopu_4mu.pdf'))
     plt.close(fig)
 
     ## max pfiso05 noPU
@@ -423,6 +469,8 @@ if __name__ == "__main__":
                                      output_data['minpfiso'].integrate('channel', slice(1,2)),
                                      sigh=output_2mu2e['minpfiso'][sampleSig].integrate('channel', slice(1,2)),
                                      title='[$2\mu 2e$] leptonjet(~neutral) min pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
     fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_2mu2e.png'))
     fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_2mu2e.pdf'))
     plt.close(fig)
@@ -431,9 +479,33 @@ if __name__ == "__main__":
                                      output_data['minpfiso'].integrate('channel', slice(2,3)),
                                      sigh=output_4mu['minpfiso'][sampleSig].integrate('channel', slice(2,3)),
                                      title='[$4\mu$] leptonjet(~neutral) min pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
     fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_4mu.png'))
     fig.savefig(join(outdir, 'chaljiso-minpfiso05nopu_4mu.pdf'))
     plt.close(fig)
+
+    ## leading leptonjet pfiso05 noPU
+    fig, (ax, rax) = make_ratio_plot(output_bkg['lj0pfiso'].integrate('channel', slice(1,2)),
+                                     output_data['lj0pfiso'].integrate('channel', slice(1,2)),
+                                     sigh=output_2mu2e['lj0pfiso'][sampleSig].integrate('channel', slice(1,2)),
+                                     title='[$2\mu 2e$] leptonjet(~neutral) leading lj pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'chaljiso-lj0pfiso05nopu_2mu2e.png'))
+    fig.savefig(join(outdir, 'chaljiso-lj0pfiso05nopu_2mu2e.pdf'))
+    plt.close(fig)
+
+    fig, (ax, rax) = make_ratio_plot(output_bkg['lj0pfiso'].integrate('channel', slice(2,3)),
+                                     output_data['lj0pfiso'].integrate('channel', slice(2,3)),
+                                     sigh=output_4mu['lj0pfiso'][sampleSig].integrate('channel', slice(2,3)),
+                                     title='[$4\mu$] leptonjet(~neutral) leading lj pfiso05-noPU', overflow='none')
+    ax.vlines([0.12, 0.16], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    fig.savefig(join(outdir, 'chaljiso-lj0pfiso05nopu_4mu.png'))
+    fig.savefig(join(outdir, 'chaljiso-lj0pfiso05nopu_4mu.pdf'))
+    plt.close(fig)
+
 
     # ----------------------------------------------------------
 

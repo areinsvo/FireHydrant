@@ -94,6 +94,7 @@ class LeptonjetEventDrawer(processor.ProcessorABC):
             vx=df['pfjet_klmvtx.fCoordinates.fX'].content,
             vy=df['pfjet_klmvtx.fCoordinates.fY'].content,
             vz=df['pfjet_klmvtx.fCoordinates.fZ'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         ## attribute: `label, ismutype, iseltype`
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
@@ -123,10 +124,10 @@ class LeptonjetEventDrawer(processor.ProcessorABC):
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=( ((dtcscTime<-20).sum()==0) & ((rpcTime<-7.5).sum()==0) & (ljdsamuSubset.sum()==0) ))
 
-        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)]
+        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)&(leptonjets.mintkdist<30)]
 
         ## __twoleptonjets__
-        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)&(leptonjets.displaced.sum()>=1)
+        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)#&(leptonjets.displaced.sum()>=1)
         dileptonjets = leptonjets[twoleptonjets]
         ak4jets = ak4jets[twoleptonjets]
         wgt = weight[twoleptonjets]
@@ -152,15 +153,22 @@ class LeptonjetEventDrawer(processor.ProcessorABC):
         ###########
 
 
+        # cuts = [
+        #     wgt.astype(bool),
+        #     ((lj0.isneutral)&(lj1.isneutral)).flatten(), # both 'neutral'
+        #     (np.abs(lj0.p4.delta_phi(lj1.p4)) > np.pi / 2).flatten(),  # dphi > pi/2
+        #     (~channel_2mu2e.astype(bool)) | (channel_2mu2e.astype(bool)&(((lj0.iseltype)&(lj0.pt>60)) | ((lj1.iseltype)&(lj1.pt>60))).flatten() ), # EGMpt0>60
+        #     ak4jets.counts<4,                                      # N(jets) < 4
+        #     ak4jets[(ak4jets.pt > 30) & (np.abs(ak4jets.eta) < 2.4) & ak4jets.deepcsvTight].counts == 0,  # N(tightB)==0
+        # ]
+        # if self.data_type == 'data':
+        #     cuts[1] = ~cuts[1]
+
         cuts = [
-            ((lj0.isneutral)&(lj1.isneutral)).flatten(), # both 'neutral'
-            (np.abs(lj0.p4.delta_phi(lj1.p4)) > np.pi / 2).flatten(),  # dphi > pi/2
-            (~channel_2mu2e.astype(bool)) | (channel_2mu2e.astype(bool)&(((lj0.iseltype)&(lj0.pt>60)) | ((lj1.iseltype)&(lj1.pt>60))).flatten() ), # EGMpt0>60
-            ak4jets.counts<4,                                      # N(jets) < 4
-            ak4jets[(ak4jets.pt > 30) & (np.abs(ak4jets.eta) < 2.4) & ak4jets.deepcsvTight].counts == 0,  # N(tightB)==0
+            wgt.astype(bool),
+            ((~lj0.isneutral)&(~lj1.isneutral)).flatten(),
+            (np.abs(lj0.p4.delta_phi(lj1.p4)) > 2.98).flatten(),
         ]
-        if self.data_type == 'data':
-            cuts[1] = ~cuts[1]
 
         totcut = np.logical_and.reduce(cuts)
 
@@ -207,13 +215,15 @@ if __name__ == "__main__":
 
     print('4mu'.center(80, '_'))
     print(df_4mu)
+    print(df_4mu.shape)
 
     print('\n+++ ABC')
     for row in df_4mu.query('era!=3').itertuples(index=False):
         print(f'{row.run}:{row.lumi}:{row.event}')
-    print('\n+++ D')
-    for row in df_4mu.query('era==3').itertuples(index=False):
-        print(f'{row.run}:{row.lumi}:{row.event}')
+    for i, era in enumerate(list('ABCD')):
+        print(f'\n+++ {era}')
+        for row in df_4mu.query(f'era=={i}').itertuples(index=False):
+            print(f'{row.run}:{row.lumi}:{row.event}')
 
 
     df_2mu2e = pd.DataFrame(
@@ -230,10 +240,12 @@ if __name__ == "__main__":
 
     print('2mu2e'.center(80, '_'))
     print(df_2mu2e)
+    print(df_2mu2e.shape)
 
     print('\n+++ ABC')
     for row in df_2mu2e.query('era!=3').itertuples(index=False):
         print(f'{row.run}:{row.lumi}:{row.event}')
-    print('\n+++ D')
-    for row in df_2mu2e.query('era==3').itertuples(index=False):
-        print(f'{row.run}:{row.lumi}:{row.event}')
+    for i, era in enumerate(list('ABCD')):
+        print(f'\n+++ {era}')
+        for row in df_2mu2e.query(f'era=={i}').itertuples(index=False):
+            print(f'{row.run}:{row.lumi}:{row.event}')

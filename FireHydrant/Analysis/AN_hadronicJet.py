@@ -34,6 +34,7 @@ bkgDS, bkgMAP, bkgSCALE = dml.fetch('bkg')
 
 sdml = SigDatasetMapLoader()
 sigDS_2mu2e, sigSCALE_2mu2e = sdml.fetch('2mu2e')
+sigDS_4mu, sigSCALE_4mu = sdml.fetch('4mu')
 
 
 class HadronicJetProcessor(processor.ProcessorABC):
@@ -96,8 +97,7 @@ class HadronicJetProcessor(processor.ProcessorABC):
         )
         deepcsv_tight = np.bitwise_and(ak4jets.deepcsv, 1<<2)==(1<<2)
         ak4jets.add_attributes(deepcsvTight=deepcsv_tight,)
-        # ak4jets=ak4jets[ak4jets.jetid&(ak4jets.pt>20)&(np.abs(ak4jets.eta)<2.5)&(ak4jets.muefrac<0.7)&(ak4jets.emefrac<0.6)]
-        ak4jets=ak4jets[ak4jets.jetid&(ak4jets.pt>20)&(np.abs(ak4jets.eta)<2.5)&(ak4jets.chahadfrac>0.4)]
+        ak4jets=ak4jets[ak4jets.jetid&(ak4jets.pt>30)&(np.abs(ak4jets.eta)<2.4)]
 
         leptonjets = JaggedCandidateArray.candidatesfromcounts(
             df['pfjet_p4'],
@@ -108,6 +108,7 @@ class HadronicJetProcessor(processor.ProcessorABC):
             vx=df['pfjet_klmvtx.fCoordinates.fX'].content,
             vy=df['pfjet_klmvtx.fCoordinates.fY'].content,
             vz=df['pfjet_klmvtx.fCoordinates.fZ'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         leptonjets.add_attributes(vxy=np.hypot(leptonjets.vx, leptonjets.vy))
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
@@ -127,10 +128,13 @@ class HadronicJetProcessor(processor.ProcessorABC):
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=(ljdsamuSubset.sum()==0))
 
-        leptonjets = leptonjets[(leptonjets.isneutral)&(leptonjets.nocosmic)]
+        leptonjets = leptonjets[(leptonjets.isneutral)&(leptonjets.nocosmic)&(leptonjets.pt>30)&(leptonjets.mintkdist<50)]
 
-        ## __ twoleptonjets__ AND >=1 displaced
-        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)&(leptonjets.displaced.sum()>=1)
+        # mask_ = ak4jets.match(leptonjets, deltaRCut=0.4)
+        # ak4jets = ak4jets[~mask_]
+
+        ## __ twoleptonjets__
+        twoleptonjets = (leptonjets.counts>=2)&(leptonjets.ismutype.sum()>=1)
         dileptonjets = leptonjets[twoleptonjets]
         ak4jets = ak4jets[twoleptonjets]
         wgt = weight[twoleptonjets]
@@ -151,8 +155,11 @@ class HadronicJetProcessor(processor.ProcessorABC):
         channel_ = channel_2mu2e + channel_4mu
         ###########
 
+        ak4jets = ak4jets[ak4jets.pt>(lj0.pt.flatten())]
+
         output['njets'].fill(dataset=dataset, cnt=ak4jets.counts, weight=wgt, channel=channel_)
-        ak4jets = ak4jets[(ak4jets.pt>30)&(np.abs(ak4jets.eta)<2.4)&(ak4jets.deepcsvTight)]
+        if ak4jets.flatten().size !=0:
+            ak4jets = ak4jets[(ak4jets.pt>30)&(np.abs(ak4jets.eta)<2.4)&(ak4jets.deepcsvTight)]
         output['ntightb'].fill(dataset=dataset, cnt=ak4jets.counts, weight=wgt, channel=channel_)
 
         return output
@@ -193,6 +200,13 @@ if __name__ == "__main__":
                                   executor_args=dict(workers=12, flatten=False),
                                   chunksize=500000,
                                  )
+    out_sig4mu = processor.run_uproot_job(sigDS_4mu,
+                                  treename='ffNtuplizer/ffNtuple',
+                                  processor_instance=HadronicJetProcessor(data_type='sig-4mu'),
+                                  executor=processor.futures_executor,
+                                  executor_args=dict(workers=12, flatten=False),
+                                  chunksize=500000,
+                                 )
 
     out_bkg = processor.run_uproot_job(bkgDS,
                                   treename='ffNtuplizer/ffNtuple',
@@ -204,65 +218,87 @@ if __name__ == "__main__":
 
     import re
     longdecay = re.compile('^.*_lxy-300$')
+    sampleSig = re.compile('mXX-150_mA-0p25_lxy-300|mXX-500_mA-1p2_lxy-300|mXX-800_mA-5_lxy-300')
 
     # N(AK4PFCHS)
-    fig, axes = plt.subplots(1,2,figsize=(16,6))
-    fig.subplots_adjust(wspace=0.15)
-    bkghist = out_bkg['njets'].integrate('channel', slice(1,2))
-    hist.plot1d(bkghist, overlay='cat', ax=axes[0], stack=True, overflow='over',
-                line_opts=None, fill_opts=fill_opts, error_opts=error_opts,)
-    sighist = out_sig2mu2e['njets'][longdecay].sum('dataset').integrate('channel', slice(1,2))
-    hist.plot1d(sighist, ax=axes[1], overflow='over', density=True)
+    fig, ax = make_mc_plot(out_bkg['njets'].integrate('channel', slice(1,2)),
+                           sigh=out_sig2mu2e['njets'][sampleSig].integrate('channel', slice(1,2)),
+                           title='[$2\mu 2e$] Hadronic jets multiplicity')
+    ax.vlines([1,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
 
-    axes[0].set_title('[$2\mu 2e$|BackgroundMC] AK4PFCHS\n(jetId, $p_T$>20, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
-    axes[1].set_title('[$2\mu 2e$|SignalMC] AK4PFCHS\n(jetId, $p_T$>20, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
-    axes[0].text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=axes[0].transAxes)
-    axes[0].set_yscale('log')
-    for ax in axes:
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
-        ax.vlines([4,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+    # fig, axes = plt.subplots(1,2,figsize=(16,6))
+    # fig.subplots_adjust(wspace=0.15)
+    # bkghist = out_bkg['njets'].integrate('channel', slice(1,2))
+    # hist.plot1d(bkghist, overlay='cat', ax=axes[0], stack=True, overflow='over',
+    #             line_opts=None, fill_opts=fill_opts, error_opts=error_opts,)
+    # sighist = out_sig2mu2e['njets'][longdecay].sum('dataset').integrate('channel', slice(1,2))
+    # hist.plot1d(sighist, ax=axes[1], overflow='over', density=True)
 
-    axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
-    axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
+    # axes[0].set_title('[$2\mu 2e$|BackgroundMC] AK4PFCHS\n(jetId, $p_T$>20, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
+    # axes[1].set_title('[$2\mu 2e$|SignalMC] AK4PFCHS\n(jetId, $p_T$>20, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
+    # axes[0].text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=axes[0].transAxes)
+    # axes[0].set_yscale('log')
+    # for ax in axes:
+    #     ax.autoscale(axis='both', tight=True)
+    #     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    #     ax.vlines([4,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
 
-    hdlSig = tuple(axes[1].get_legend_handles_labels()[0])
-    fracSig = sighist.integrate('cnt', slice(4,10)).values()[()]/sighist.sum('cnt').values()[()]
-    axes[1].legend([hdlSig,], [f'N$\geqslant$4: {fracSig*100:.2f}%',])
+    # axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+    # axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
+
+    # hdlSig = tuple(axes[1].get_legend_handles_labels()[0])
+    # fracSig = sighist.integrate('cnt', slice(4,10)).values()[()]/sighist.sum('cnt').values()[()]
+    # axes[1].legend([hdlSig,], [f'N$\geqslant$4: {fracSig*100:.2f}%',])
+
+    print("## NAK4PFCHS-2mu2e")
+    sigh = out_sig2mu2e['njets'].integrate('dataset', 'mXX-500_mA-1p2_lxy-300').integrate('channel', slice(1,2))
+    bkgh = out_bkg['njets'].sum('cat').integrate('channel', slice(1,2))
+    print('sig:', sigh.values()[()])
+    print('bkg:', bkgh.values()[()])
+    print('sig/bkg > 0:', sigh.values()[()][1:].sum()/bkgh.values()[()][1:].sum())
 
     fig.savefig(join(outdir, 'NAK4PFCHS-2mu2e.png'))
     fig.savefig(join(outdir, 'NAK4PFCHS-2mu2e.pdf'))
     plt.close(fig)
 
-    # N(tight b)
-    fig, axes = plt.subplots(1,2,figsize=(16,6))
-    fig.subplots_adjust(wspace=0.15)
-    bkghist = out_bkg['ntightb'].integrate('channel', slice(1,2))
-    hist.plot1d(bkghist, overlay='cat', ax=axes[0], stack=True, overflow='over',
-                line_opts=None, fill_opts=fill_opts, error_opts=error_opts,)
-    sighist = out_sig2mu2e['ntightb'][longdecay].sum('dataset').integrate('channel', slice(1,2))
-    hist.plot1d(sighist, ax=axes[1], overflow='over', density=True)
+    fig, ax = make_mc_plot(out_bkg['njets'].integrate('channel', slice(2,3)),
+                           sigh=out_sig4mu['njets'][sampleSig].integrate('channel', slice(2,3)),
+                           title='[$4\mu$] Hadronic jets multiplicity')
 
-    axes[0].set_title('[$2\mu 2e$|BackgroundMC] DeepCSV tight AK4PFCHS\n(jetId, $p_T$>30, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
-    axes[1].set_title('[$2\mu 2e$|SignalMC] DeepCSV tight AK4PFCHS\n(jetId, $p_T$>30, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
-    axes[0].text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=axes[0].transAxes)
-    axes[0].set_yscale('log')
-    for ax in axes:
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlim([0, 5])
-        ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
-        ax.vlines([1,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
-
-    axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
-    axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
-
-    hdlSig = tuple(axes[1].get_legend_handles_labels()[0])
-    fracSig = sighist.integrate('cnt', slice(1,10)).values()[()]/sighist.sum('cnt').values()[()]
-    axes[1].legend([hdlSig,], [f'N$\geqslant$1: {fracSig*100:.2f}%',])
-
-    fig.savefig(join(outdir, 'NTightB-2mu2e.png'))
-    fig.savefig(join(outdir, 'NTightB-2mu2e.pdf'))
+    fig.savefig(join(outdir, 'NAK4PFCHS-4mu.png'))
+    fig.savefig(join(outdir, 'NAK4PFCHS-4mu.pdf'))
     plt.close(fig)
+
+
+    # N(tight b)
+    # fig, axes = plt.subplots(1,2,figsize=(16,6))
+    # fig.subplots_adjust(wspace=0.15)
+    # bkghist = out_bkg['ntightb'].integrate('channel', slice(1,2))
+    # hist.plot1d(bkghist, overlay='cat', ax=axes[0], stack=True, overflow='over',
+    #             line_opts=None, fill_opts=fill_opts, error_opts=error_opts,)
+    # sighist = out_sig2mu2e['ntightb'][longdecay].sum('dataset').integrate('channel', slice(1,2))
+    # hist.plot1d(sighist, ax=axes[1], overflow='over', density=True)
+
+    # axes[0].set_title('[$2\mu 2e$|BackgroundMC] DeepCSV tight AK4PFCHS\n(jetId, $p_T$>30, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
+    # axes[1].set_title('[$2\mu 2e$|SignalMC] DeepCSV tight AK4PFCHS\n(jetId, $p_T$>30, |$\eta$|<2.5) multiplicity', x=0.0, ha="left")
+    # axes[0].text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=axes[0].transAxes)
+    # axes[0].set_yscale('log')
+    # for ax in axes:
+    #     ax.autoscale(axis='both', tight=True)
+    #     ax.set_xlim([0, 5])
+    #     ax.set_xlabel(ax.get_xlabel(), x=1.0, ha="right")
+    #     ax.vlines([1,], 0, 1, linestyles='dashed', colors='tab:gray', transform=ax.get_xaxis_transform())
+
+    # axes[0].set_ylabel(ax.get_ylabel(), y=1.0, ha="right")
+    # axes[1].set_ylabel('Norm. '+ax.get_ylabel(), y=1.0, ha="right")
+
+    # hdlSig = tuple(axes[1].get_legend_handles_labels()[0])
+    # fracSig = sighist.integrate('cnt', slice(1,10)).values()[()]/sighist.sum('cnt').values()[()]
+    # axes[1].legend([hdlSig,], [f'N$\geqslant$1: {fracSig*100:.2f}%',])
+
+    # fig.savefig(join(outdir, 'NTightB-2mu2e.png'))
+    # fig.savefig(join(outdir, 'NTightB-2mu2e.pdf'))
+    # plt.close(fig)
 
 
     # ----------------------------------------------------------
