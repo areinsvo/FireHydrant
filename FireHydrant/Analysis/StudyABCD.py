@@ -1,10 +1,13 @@
 #!/usr/bin/env python
-"""ABCD scatter
-- x: dphi of leptonjet pair
-- y: min pfiso05NoPU of leading two leptonjets
+"""ABCD hist2D
++ channel 4mu
+    - x: min pfiso
+    - y: both neutral/charged
++ channel 2mu2e
+    - x: min pfiso
+    - y: #jets=0/>0
 """
 import argparse
-from contextlib import contextmanager
 
 import awkward
 import coffea.processor as processor
@@ -27,31 +30,32 @@ parser = argparse.ArgumentParser(description="leptonjet ABCD")
 parser.add_argument("--sync", action='store_true', help="issue rsync command to sync plots folder to lxplus web server")
 args = parser.parse_args()
 
-# import ROOT
-# ROOT.gROOT.SetBatch()
-
 
 dml = DatasetMapLoader()
-dataDS, dataMAP = dml.fetch('data')
+# dataDS, dataMAP = dml.fetch('data')
+bkgDS, bkgMAP, bkgSCALE = dml.fetch('bkg')
 
-# @contextmanager
-# def _setIgnoreLevel(level):
-#     originalLevel = ROOT.gErrorIgnoreLevel
-#     ROOT.gErrorIgnoreLevel = level
-#     yield
-#     ROOT.gErrorIgnoreLevel = originalLevel
+sdml = SigDatasetMapLoader()
+sigDS_2mu2e, sigSCALE_2mu2e = sdml.fetch('2mu2e')
+sigDS_4mu, sigSCALE_4mu = sdml.fetch('4mu')
+
 
 
 class LjABCDProcessor(processor.ProcessorABC):
-    def __init__(self, bothNeutral=True):
-        self.bothNeutral = bothNeutral
+    def __init__(self, data_type='bkg'):
+        self.data_type = data_type
+
         dataset_axis = hist.Cat('dataset', 'dataset')
+        iso_axis = hist.Bin('iso', 'min pfIso', 50, 0, 0.5)
+        bin_axis = hist.Bin('val', 'binary value', 3, 0, 3)
         self._accumulator = processor.dict_accumulator({
-            'miniso': processor.column_accumulator(np.zeros(shape=(0,))),
-            'dphi': processor.column_accumulator(np.zeros(shape=(0,))),
-            'channel': processor.column_accumulator(np.zeros(shape=(0,))),
-            'categ': processor.column_accumulator(np.zeros(shape=(0,))),
+            'chan-4mu': hist.Hist('Counts', dataset_axis, iso_axis, bin_axis),
+            'chan-2mu2e': hist.Hist('Counts', dataset_axis, iso_axis, bin_axis),
         })
+        self.pucorrs = get_pu_weights_function()
+        ## NOT applied for now
+        self.nlo_w = get_nlo_weight_function('w')
+        self.nlo_z = get_nlo_weight_function('z')
 
     @property
     def accumulator(self):
@@ -63,6 +67,10 @@ class LjABCDProcessor(processor.ProcessorABC):
 
         ## construct weights ##
         wgts = processor.Weights(df.size)
+        if self.data_type!='data':
+            wgts.add('genw', df['weight'])
+            npv = df['trueInteractionNum']
+            wgts.add('pileup', *(f(npv) for f in self.pucorrs))
 
         triggermask = np.logical_or.reduce([df[t] for t in Triggers])
         wgts.add('trigger', triggermask)
@@ -74,6 +82,16 @@ class LjABCDProcessor(processor.ProcessorABC):
         weight = wgts.weight()
         ########################
 
+        ak4jets = JaggedCandidateArray.candidatesfromcounts(
+            df['akjet_ak4PFJetsCHS_p4'],
+            px=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fX'].content,
+            py=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fY'].content,
+            pz=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fZ'].content,
+            energy=df['akjet_ak4PFJetsCHS_p4.fCoordinates.fT'].content,
+            jetid=df['akjet_ak4PFJetsCHS_jetid'].content,
+        )
+        ak4jets=ak4jets[ak4jets.jetid&(ak4jets.pt>30)&(np.abs(ak4jets.eta)<2.4)]
+
         leptonjets = JaggedCandidateArray.candidatesfromcounts(
             df['pfjet_p4'],
             px=df['pfjet_p4.fCoordinates.fX'].content,
@@ -82,7 +100,7 @@ class LjABCDProcessor(processor.ProcessorABC):
             energy=df['pfjet_p4.fCoordinates.fT'].content,
             sumtkpt=df['pfjet_tkPtSum05'].content,
             pfiso=df['pfjet_pfIsolationNoPU05'].content,
-            isodbeta=df['pfjet_pfiso'].content,
+            mintkdist=df['pfjet_pfcands_minTwoTkDist'].content,
         )
         ljdautype = awkward.fromiter(df['pfjet_pfcand_type'])
         npfmu = (ljdautype==3).sum()
@@ -97,54 +115,63 @@ class LjABCDProcessor(processor.ProcessorABC):
         ljdaucharge = awkward.fromiter(df['pfjet_pfcand_charge']).sum()
         leptonjets.add_attributes(qsum=ljdaucharge)
         leptonjets.add_attributes(isneutral=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum==0))))
+        leptonjets.add_attributes(mucharged=(leptonjets.iseltype | (leptonjets.ismutype&(leptonjets.qsum!=0))))
         ljdsamuSubset = fromNestNestIndexArray(df['dsamuon_isSubsetFilteredCosmic1Leg'], awkward.fromiter(df['pfjet_pfcand_dsamuonIdx']))
         leptonjets.add_attributes(nocosmic=(ljdsamuSubset.sum()==0))
-        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)]
+        leptonjets = leptonjets[(leptonjets.nocosmic)&(leptonjets.pt>30)&(leptonjets.mintkdist<50)]
 
         ## __ twoleptonjets__
         twoleptonjets = leptonjets.counts>=2
         dileptonjets = leptonjets[twoleptonjets]
+        ak4jets = ak4jets[twoleptonjets]
         wgt = weight[twoleptonjets]
 
         if dileptonjets.size==0: return output
         lj0 = dileptonjets[dileptonjets.pt.argmax()]
         lj1 = dileptonjets[dileptonjets.pt.argsort()[:, 1:2]]
 
+        ak4jets = ak4jets[ak4jets.pt>(lj0.pt.flatten())]
+        ak4jetCounts = (ak4jets.counts>0).astype(int)
+        minpfiso = ((lj0.pfiso>lj1.pfiso).astype(int)*lj1.pfiso + (lj0.pfiso<lj1.pfiso).astype(int)*lj0.pfiso).flatten()
+        ljneutrality = ((lj0.isneutral&lj1.isneutral).astype(int)*1+(lj0.mucharged&lj1.mucharged).astype(int)*2).flatten()
+
         ## channel def ##
+        #### 2mu2e
         singleMuljEvents = dileptonjets.ismutype.sum()==1
         muljInLeading2Events = (lj0.ismutype | lj1.ismutype).flatten()
-        channel_2mu2e = (singleMuljEvents&muljInLeading2Events).astype(int)*1
+        channel_2mu2e = singleMuljEvents&muljInLeading2Events
 
+        output['chan-2mu2e'].fill(dataset=dataset, iso=minpfiso[channel_2mu2e], val=ak4jetCounts[channel_2mu2e], weight=wgt[channel_2mu2e])
+
+        #### 4mu
         doubleMuljEvents = dileptonjets.ismutype.sum()==2
         muljIsLeading2Events = (lj0.ismutype & lj1.ismutype).flatten()
-        channel_4mu = (doubleMuljEvents&muljIsLeading2Events).astype(int)*2
+        channel_4mu = doubleMuljEvents&muljIsLeading2Events
 
-        channel_ = channel_2mu2e + channel_4mu
+        output['chan-4mu'].fill(dataset=dataset, iso=minpfiso[channel_4mu], val=ljneutrality[channel_4mu], weight=wgt[channel_4mu])
+
         ###########
 
-        minpfiso = (lj0.pfiso>lj1.pfiso).astype(int)*lj1.pfiso + (lj0.pfiso<lj1.pfiso).astype(int)*lj0.pfiso
-        dphi = np.abs(lj0.p4.delta_phi(lj1.p4))
-        categ = lj0.ndsa*10 + lj1.ndsa
-
-        mask_ = (lj0.isneutral&lj1.isneutral).flatten()
-        if self.bothNeutral is False:
-            mask_ = ~mask_
-            mask_ = ((channel_==2)&((~lj0.isneutral&(~lj1.isneutral)).flatten())) | ((channel_==1)&mask_)
-
-        channel_ = channel_[mask_]
-        wgt = wgt[mask_]
-        minpfiso = minpfiso[mask_]
-        dphi = dphi[mask_]
-        categ = categ[mask_]
-
-        output['miniso'] += processor.column_accumulator(minpfiso[wgt.astype(bool)].flatten())
-        output['dphi'] += processor.column_accumulator(dphi[wgt.astype(bool)].flatten())
-        output['channel'] += processor.column_accumulator(channel_[wgt.astype(bool)].flatten())
-        output['categ'] += processor.column_accumulator(categ[wgt.astype(bool)].flatten())
 
         return output
 
     def postprocess(self, accumulator):
+        origidentity = list(accumulator)
+        for k in origidentity:
+            if self.data_type == 'bkg':
+                accumulator[k].scale(bkgSCALE, axis='dataset')
+                accumulator[k] = accumulator[k].group("dataset",
+                                                    hist.Cat("cat", "datasets", sorting='integral'),
+                                                    bkgMAP)
+            if self.data_type == 'data':
+                accumulator[k] = accumulator[k].group("dataset",
+                                                    hist.Cat("cat", "datasets",),
+                                                    dataMAP)
+            if self.data_type == 'sig-2mu2e':
+                accumulator[k].scale(sigSCALE_2mu2e, axis='dataset')
+            if self.data_type == 'sig-4mu':
+                accumulator[k].scale(sigSCALE_4mu, axis='dataset')
+
         return accumulator
 
 
@@ -158,208 +185,117 @@ if __name__ == "__main__":
     outdir = join(os.getenv('FH_BASE'), "Imgs", reldir)
     if not isdir(outdir): os.makedirs(outdir)
 
-    print('[both neutral]')
-    output = processor.run_uproot_job(dataDS,
+
+    output_2mu2e = processor.run_uproot_job(sigDS_2mu2e,
                                     treename='ffNtuplizer/ffNtuple',
-                                    processor_instance=LjABCDProcessor(bothNeutral=True),
+                                    processor_instance=LjABCDProcessor(data_type='sig-2mu2e'),
                                     executor=processor.futures_executor,
                                     executor_args=dict(workers=12, flatten=False),
                                     chunksize=500000,
                                     )
-    chan_ = output['channel'].value
-    miniso_ = output['miniso'].value
-    dphi_ = output['dphi'].value
-    categ_ = output['categ'].value
 
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.scatter(dphi_[chan_==1.], miniso_[chan_==1.], s=4, marker='o', c='blue')
-    ax.set_title('[$2\mu 2e$] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-    ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-    ax.set_ylabel('min(pfiso)', y=1, ha='right')
-    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-    ax.autoscale(axis='both', tight=True)
-    ax.set_xlim(0, np.pi)
-    ax.set_ylim(0, 0.6)
-
-    fig.savefig(join(outdir, 'dphi-miniso-neulj_2mu2e.png'))
-    fig.savefig(join(outdir, 'dphi-miniso-neulj_2mu2e.pdf'))
-    plt.close(fig)
-
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.scatter(dphi_[chan_==2.], miniso_[chan_==2.], s=4, marker='o', c='blue')
-    ax.set_title('[$4\mu$] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-    ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-    ax.set_ylabel('min(pfiso)', y=1, ha='right')
-    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-    ax.autoscale(axis='both', tight=True)
-    ax.set_xlim(0, np.pi)
-    ax.set_ylim(0, 0.6)
-
-    fig.savefig(join(outdir, 'dphi-miniso-neulj_4mu.png'))
-    fig.savefig(join(outdir, 'dphi-miniso-neulj_4mu.pdf'))
-    plt.close(fig)
-
-
-    categories = {
-        '2mu2e': [
-            (chan_==1.)&(categ_==0),
-            (chan_==1.)&((categ_==1)|(categ_==10)),
-            (chan_==1.)&((categ_==2)|(categ_==20)),
-        ],
-        '4mu': [
-            (chan_==2.)&(categ_==0),
-            (chan_==2.)&((categ_==1)|(categ_==10)),
-            (chan_==2.)&((categ_==2)|(categ_==20)),
-            (chan_==2.)&(categ_==11),
-            (chan_==2.)&((categ_==12)|(categ_==21)),
-            (chan_==2.)&(categ_==22),
-        ]
-    }
-
-    for i, c in enumerate(categories['2mu2e']):
-        fig, ax = plt.subplots(figsize=(8,6))
-        ax.scatter(dphi_[c], miniso_[c], s=4, marker='o', c='blue')
-        ax.set_title(f'[$2\mu 2e$, categ{i}] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-        ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-        ax.set_ylabel('min(pfiso)', y=1, ha='right')
-        text = 'category definition:\n0: muonlj.nDSA==0\n1: muonlj.nDSA==1\n2: muonlj.nDSA==2'
-        ax.text(0.99, 0.99, text, ha='right', va='top', transform=ax.transAxes)
-        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlim(0, np.pi)
-        ax.set_ylim(0, 0.6)
-
-        fig.savefig(join(outdir, f'dphi-miniso-neulj-categ{i}_2mu2e.png'))
-        fig.savefig(join(outdir, f'dphi-miniso-neulj-categ{i}_2mu2e.pdf'))
-        plt.close(fig)
-
-    for i, c in enumerate(categories['4mu']):
-        fig, ax = plt.subplots(figsize=(8,6))
-        ax.scatter(dphi_[c], miniso_[c], s=4, marker='o', c='blue')
-        ax.set_title(f'[$4\mu$, categ{i}] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-        ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-        ax.set_ylabel('min(pfiso)', y=1, ha='right')
-        text = '\n'.join([
-            'category definition:',
-            '0: 0 muonlj.nDSA>0',
-            '1: 1 muonlj.nDSA==1',
-            '2: 1 muonlj.nDSA==2',
-            '3: 2 muonlj.nDSA==1',
-            '4: (1 muonlj.nDSA==1)&(1muonlj.nDSA==2)',
-            '5: 2 muonlj.nDSA==2'
-        ])
-        ax.text(0.99, 0.99, text, ha='right', va='top', transform=ax.transAxes)
-        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlim(0, np.pi)
-        ax.set_ylim(0, 0.6)
-
-        fig.savefig(join(outdir, f'dphi-miniso-neulj-categ{i}_4mu.png'))
-        fig.savefig(join(outdir, f'dphi-miniso-neulj-categ{i}_4mu.pdf'))
-        plt.close(fig)
-
-
-    # --------------------------------------------------------
-
-    print('[both charged]')
-    output = processor.run_uproot_job(dataDS,
+    output_4mu = processor.run_uproot_job(sigDS_4mu,
                                     treename='ffNtuplizer/ffNtuple',
-                                    processor_instance=LjABCDProcessor(bothNeutral=False),
+                                    processor_instance=LjABCDProcessor(data_type='sig-4mu'),
                                     executor=processor.futures_executor,
                                     executor_args=dict(workers=12, flatten=False),
                                     chunksize=500000,
                                     )
-    chan_ = output['channel'].value
-    miniso_ = output['miniso'].value
-    dphi_ = output['dphi'].value
-    categ_ = output['categ'].value
 
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.scatter(dphi_[chan_==1.], miniso_[chan_==1.], s=4, marker='o', c='blue')
-    ax.set_title('[$2\mu 2e$] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-    ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-    ax.set_ylabel('min(pfiso)', y=1, ha='right')
-    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-    ax.autoscale(axis='both', tight=True)
-    ax.set_xlim(0, np.pi)
-    ax.set_ylim(0, 0.6)
+    output_bkg = processor.run_uproot_job(bkgDS,
+                                    treename='ffNtuplizer/ffNtuple',
+                                    processor_instance=LjABCDProcessor(data_type='bkg'),
+                                    executor=processor.futures_executor,
+                                    executor_args=dict(workers=12, flatten=False),
+                                    chunksize=500000,
+                                    )
 
-    fig.savefig(join(outdir, 'dphi-miniso-chalj_2mu2e.png'))
-    fig.savefig(join(outdir, 'dphi-miniso-chalj_2mu2e.pdf'))
-    plt.close(fig)
+    signalPts = [
+        'mXX-150_mA-0p25_lxy-300',
+        'mXX-500_mA-1p2_lxy-300',
+        'mXX-800_mA-5_lxy-300',
+    ]
 
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.scatter(dphi_[chan_==2.], miniso_[chan_==2.], s=4, marker='o', c='blue')
-    ax.set_title('[$4\mu$] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-    ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-    ax.set_ylabel('min(pfiso)', y=1, ha='right')
-    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-    ax.autoscale(axis='both', tight=True)
-    ax.set_xlim(0, np.pi)
-    ax.set_ylim(0, 0.6)
+    for p in signalPts:
+        htitle = f'[2$\mu$2e|{p}] #AK4Jet vs. leptonjet min pfiso'
+        fig, ax = make_2d_hist(output_2mu2e['chan-2mu2e'].integrate('dataset', p), 'iso',
+                               title=htitle, zscale='log', ylim=[0,2], ylabel='#AK4Jets', xoverflow='over')
+        ax.set_yticks([0.5, 1.5])
+        ax.set_yticklabels(['0', '>0'])
 
-    fig.savefig(join(outdir, 'dphi-miniso-chalj_4mu.png'))
-    fig.savefig(join(outdir, 'dphi-miniso-chalj_4mu.pdf'))
-    plt.close(fig)
-
-    categories = {
-        '2mu2e': [
-            (chan_==1.)&(categ_==0),
-            (chan_==1.)&((categ_==1)|(categ_==10)),
-            (chan_==1.)&((categ_==2)|(categ_==20)),
-        ],
-        '4mu': [
-            (chan_==2.)&(categ_==0),
-            (chan_==2.)&((categ_==1)|(categ_==10)),
-            (chan_==2.)&((categ_==2)|(categ_==20)),
-            (chan_==2.)&(categ_==11),
-            (chan_==2.)&((categ_==12)|(categ_==21)),
-            (chan_==2.)&(categ_==22),
-        ]
-    }
-
-    for i, c in enumerate(categories['2mu2e']):
-        fig, ax = plt.subplots(figsize=(8,6))
-        ax.scatter(dphi_[c], miniso_[c], s=4, marker='o', c='blue')
-        ax.set_title(f'[$2\mu 2e$, categ{i}] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-        ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-        ax.set_ylabel('min(pfiso)', y=1, ha='right')
-        text = 'category definition:\n0: muonlj.nDSA==0\n1: muonlj.nDSA==1\n2: muonlj.nDSA==2'
-        ax.text(0.99, 0.99, text, ha='right', va='top', transform=ax.transAxes)
-        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlim(0, np.pi)
-        ax.set_ylim(0, 0.6)
-
-        fig.savefig(join(outdir, f'dphi-miniso-chalj-categ{i}_2mu2e.png'))
-        fig.savefig(join(outdir, f'dphi-miniso-chalj-categ{i}_2mu2e.pdf'))
+        fig.savefig(join(outdir, f'{p}__2mu2e.png'))
+        fig.savefig(join(outdir, f'{p}__2mu2e.pdf'))
         plt.close(fig)
 
-    for i, c in enumerate(categories['4mu']):
-        fig, ax = plt.subplots(figsize=(8,6))
-        ax.scatter(dphi_[c], miniso_[c], s=4, marker='o', c='blue')
-        ax.set_title(f'[$4\mu$, categ{i}] leptonjet pair $\Delta\phi$ vs min(pfiso05)', x=0, ha='left')
-        ax.set_xlabel('$\Delta\phi$', x=1, ha='right')
-        ax.set_ylabel('min(pfiso)', y=1, ha='right')
-        text = '\n'.join([
-            'category definition:',
-            '0: 0 muonlj.nDSA>0',
-            '1: 1 muonlj.nDSA==1',
-            '2: 1 muonlj.nDSA==2',
-            '3: 2 muonlj.nDSA==1',
-            '4: (1 muonlj.nDSA==1)&(1muonlj.nDSA==2)',
-            '5: 2 muonlj.nDSA==2'
-        ])
-        ax.text(0.99, 0.99, text, ha='right', va='top', transform=ax.transAxes)
-        ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
-        ax.autoscale(axis='both', tight=True)
-        ax.set_xlim(0, np.pi)
-        ax.set_ylim(0, 0.6)
+        fig, ax = make_2d_hist(output_2mu2e['chan-2mu2e'].integrate('dataset', p).rebin('iso', hist.Bin('iso', 'min pfiso', np.array([0, 0.12, 1]))), 'iso',
+                               title=htitle, zscale='log', text_opts=dict(), ylim=[0,2], ylabel='#AK4Jets', xoverflow='over')
+        ax.set_yticks([0.5, 1.5])
+        ax.set_yticklabels(['0', '>0'])
+        ax.set_xticks([0, 0.12, 1])
 
-        fig.savefig(join(outdir, f'dphi-miniso-chalj-categ{i}_4mu.png'))
-        fig.savefig(join(outdir, f'dphi-miniso-chalj-categ{i}_4mu.pdf'))
+        fig.savefig(join(outdir, f'{p}__2mu2e_4bins.png'))
+        fig.savefig(join(outdir, f'{p}__2mu2e_4bins.pdf'))
         plt.close(fig)
 
+        # ------------------------------------------
+
+        htitle = f'[4$\mu$|{p}] leptonjet neutrality vs. min pfiso'
+        fig, ax = make_2d_hist(output_4mu['chan-4mu'].integrate('dataset', p), 'iso',
+                               title=htitle, zscale='log', ylim=[1,3], ylabel='Neutrality', xoverflow='over')
+        ax.set_yticks([1.5, 2.5])
+        ax.set_yticklabels(['Both neutral', 'Both charged'])
+
+        fig.savefig(join(outdir, f'{p}__4mu.png'))
+        fig.savefig(join(outdir, f'{p}__4mu.pdf'))
+        plt.close(fig)
+
+        fig, ax = make_2d_hist(output_4mu['chan-4mu'].integrate('dataset', p).rebin('iso', hist.Bin('iso', 'min pfiso', np.array([0, 0.12, 1]))), 'iso',
+                               title=htitle, zscale='log', text_opts=dict(), ylim=[1,3], ylabel='Neutrality', xoverflow='over')
+        ax.set_yticks([1.5, 2.5])
+        ax.set_yticklabels(['Both neutral', 'Both charged'])
+        ax.set_xticks([0, 0.12, 1])
+
+        fig.savefig(join(outdir, f'{p}__4mu_4bins.png'))
+        fig.savefig(join(outdir, f'{p}__4mu_4bins.pdf'))
+        plt.close(fig)
+
+
+    htitle = '[2$\mu$2e|bkgmc] #AK4Jet vs. leptonjet min pfiso'
+    fig, ax = make_2d_hist(output_bkg['chan-2mu2e'].sum('cat'), 'iso',
+                           title=htitle, zscale='log', ylim=[0,2], ylabel='#AK4Jets', xoverflow='over')
+    ax.set_yticks([0.5, 1.5])
+    ax.set_yticklabels(['0', '>0'])
+    fig.savefig(join(outdir, 'bkgmc__2mu2e.png'))
+    fig.savefig(join(outdir, 'bkgmc__2mu2e.pdf'))
+    plt.close(fig)
+
+    fig, ax = make_2d_hist(output_bkg['chan-2mu2e'].sum('cat').rebin('iso', hist.Bin('iso', 'min pfiso', np.array([0, 0.12, 1]))), 'iso',
+                           title=htitle, zscale='log', text_opts=dict(), ylim=[0,2], ylabel='#AK4Jets', xoverflow='over')
+    ax.set_yticks([0.5, 1.5])
+    ax.set_yticklabels(['0', '>0'])
+    ax.set_xticks([0, 0.12, 1])
+    fig.savefig(join(outdir, 'bkgmc__2mu2e_4bins.png'))
+    fig.savefig(join(outdir, 'bkgmc__2mu2e_4bins.pdf'))
+    plt.close(fig)
+
+
+    htitle = '[4$\mu$|bkgmc] leptonjet neutrality vs. min pfiso'
+    fig, ax = make_2d_hist(output_bkg['chan-4mu'].sum('cat'), 'iso',
+                           title=htitle, zscale='log', ylim=[1,3], ylabel='Neutrality', xoverflow='over')
+    ax.set_yticks([1.5, 2.5])
+    ax.set_yticklabels(['Both neutral', 'Both charged'])
+    fig.savefig(join(outdir, 'bkgmc__4mu.png'))
+    fig.savefig(join(outdir, 'bkgmc__4mu.pdf'))
+    plt.close(fig)
+
+    fig, ax = make_2d_hist(output_bkg['chan-4mu'].sum('cat').rebin('iso', hist.Bin('iso', 'min pfiso', np.array([0, 0.12, 1]))), 'iso',
+                           title=htitle, zscale='log', text_opts=dict(), ylim=[1,3], ylabel='Neutrality', xoverflow='over')
+    ax.set_yticks([1.5, 2.5])
+    ax.set_yticklabels(['Both neutral', 'Both charged'])
+    ax.set_xticks([0, 0.12, 1])
+    fig.savefig(join(outdir, 'bkgmc__4mu_4bins.png'))
+    fig.savefig(join(outdir, 'bkgmc__4mu_4bins.pdf'))
+    plt.close(fig)
     # --------------------------------------------------------
 
     if args.sync:

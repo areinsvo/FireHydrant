@@ -157,3 +157,32 @@ def make_signal_plot(sigh, title=None, overflow='over', yscale='log'):
     ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
 
     return fig, ax
+
+
+def make_2d_hist(h, xaxis, title=None, zscale='linear', text_opts=None, **kwargs):
+    """
+    more kwargs see `coffea.hist.plot2d`
+    (https://github.com/CoffeaTeam/coffea/blob/master/coffea/hist/plot.py#L388)
+    """
+    import matplotlib.pyplot as plt
+    from coffea import hist
+
+    fig, ax = plt.subplots(1,1,figsize=(8,6))
+    if zscale=='log':
+        from matplotlib.colors import LogNorm
+        hist.plot2d(h, xaxis, ax=ax, patch_opts=dict(norm=LogNorm()), text_opts=text_opts)
+    else:
+        hist.plot2d(h, xaxis, ax=ax, text_opts=text_opts)
+
+    if 'xlabel' in kwargs: ax.set_xlabel(kwargs['xlabel'])
+    if 'ylabel' in kwargs: ax.set_ylabel(kwargs['ylabel'])
+    ax.set_xlabel(ax.get_xlabel(), x=1, ha='right')
+    ax.set_ylabel(ax.get_ylabel(), y=1, ha="right")
+
+    if 'xlim' in kwargs: ax.set_xlim(*kwargs['xlim'])
+    if 'ylim' in kwargs: ax.set_ylim(*kwargs['ylim'])
+
+    ax.set_title(title, x=0.0, ha="left")
+    ax.text(1,1,'59.74/fb (13TeV)', ha='right', va='bottom', transform=ax.transAxes)
+
+    return fig, ax
