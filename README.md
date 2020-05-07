@@ -13,6 +13,11 @@ Requirements:
 - [jupyterlab](https://github.com/jupyterlab/jupyterlab)
 
 ---
+# Log into LPC
+```
+ssh -L  8888:localhost:8888 USERNAME@cmslpc-sl7.fnal.gov
+```
+Replace 8888 with your favourite port.
 
 # Activation/Deactivation
 
@@ -44,7 +49,7 @@ jupyter lab --no-browser --port=8888 # replace by your favourite port
 3. Clone repo
 
     ```bash
-    git clone https://github.com/phylsix/FireHydrant.git
+    git clone https://github.com/areinsvo/FireHydrant.git
     cd FireHydrant
     ```
 
